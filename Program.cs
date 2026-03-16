@@ -8,7 +8,7 @@ var builder = WebApplication.CreateBuilder(args);
 
 static string GetWafekConnectionString(IConfiguration config)
 {
-    var customPath = ConfigHelper.GetConfigFilePath();
+    var customPath = Wafek_Web_Manager.ConfigHelper.GetConfigFilePath();
     if (File.Exists(customPath))
     {
         try
