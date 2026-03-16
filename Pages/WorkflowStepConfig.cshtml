@@ -1,0 +1,35 @@
+@page "/WorkflowStepConfig/{stepId:int}"
+@model Wafek_Web_Manager.Pages.WorkflowStepConfigModel
+@{
+    ViewData["Title"] = "إعداد توابع الخطوة";
+}
+<div class="container mt-4">
+    <div class="card shadow">
+        <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">إعداد توابع الميل — عند الموافقة / الرفض / التأجيل</h5>
+            <a asp-page="/WorkflowDesigner" asp-route-id="@Model.WorkflowId" class="btn btn-sm btn-light">← رجوع</a>
+        </div>
+        <div class="card-body">
+            <p class="text-muted">الخطوة: <strong>@Model.StepName</strong> (@Model.ActionType)</p>
+            @if (!string.IsNullOrEmpty(Model.Message))
+            {
+                <div class="alert @(Model.IsSuccess ? "alert-success" : "alert-danger")">@Model.Message</div>
+            }
+            <form method="post">
+                <input type="hidden" name="stepId" value="@Model.StepId" />
+                <div class="mb-3">
+                    <label class="form-label">ActionConfigJson — التوابع بصيغة JSON</label>
+                    <textarea name="actionConfigJson" class="form-control font-monospace" rows="14" style="font-size:13px">@Model.ActionConfigJson</textarea>
+                    <small class="text-muted">
+                        مثال: <code>{"responseActions":{"onApprove":[{"actionType":"ChangeSecurity","selectedValue":"guid"},{"actionType":"ExecuteProc","selectedValue":"SP_PostBond"}],"onReject":[{"actionType":"ExecuteProc","selectedValue":"SP_RejectDocument"}]}}</code>
+                    </small>
+                </div>
+                <div class="mb-3">
+                    <button type="submit" name="useTemplate" value="1" class="btn btn-outline-secondary btn-sm">استخدام قالب افتراضي</button>
+                </div>
+                <button type="submit" class="btn btn-primary">💾 حفظ التوابع</button>
+                <a asp-page="/WorkflowDesigner" asp-route-id="@Model.WorkflowId" class="btn btn-secondary">إلغاء</a>
+            </form>
+        </div>
+    </div>
+</div>

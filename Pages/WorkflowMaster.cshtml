@@ -1,0 +1,366 @@
+@page
+@model Wafek_Web_Manager.Pages.WorkflowMasterModel
+@{
+    ViewData["Title"] = "Workflow Master Designer";
+}
+
+<div class="container-fluid mt-3">
+    <div class="row">
+        <!-- القائمة الجانبية: الورك فلوز المحفوظة -->
+        <div class="col-md-3">
+            <div class="card shadow-sm h-100">
+                <div class="card-header bg-secondary text-white d-flex justify-content-between align-items-center">
+                    <h6 class="mb-0">📂 المحفوظات (Saved)</h6>
+                    <a href="/WorkflowMaster" class="btn btn-sm btn-light py-0" title="New">+ جديد</a>
+                </div>
+                <div class="list-group list-group-flush overflow-auto" style="max-height: 80vh;">
+                    @if (Model.ExistingWorkflows != null)
+                    {
+                        foreach (var wf in Model.ExistingWorkflows)
+                        {
+                            <div class="list-group-item d-flex justify-content-between align-items-center">
+                                <a href="/WorkflowDesigner/@wf.Id" class="flex-grow-1 text-decoration-none">
+                                    <div class="d-flex w-100 justify-content-between">
+                                        <h6 class="mb-1 text-primary">@wf.Name</h6>
+                                        <small class="text-muted">#@wf.Id</small>
+                                    </div>
+                                    <small class="text-muted">@wf.SourceTable</small>
+                                </a>
+                                <a href="/WorkflowDesigner/@wf.Id" class="btn btn-sm btn-info ms-2" title="إعداد توابع الموافقة/الرفض">⚙️ توابع</a>
+                            </div>
+                        }
+                    }
+                </div>
+            </div>
+        </div>
+
+        <!-- منطقة العمل: المحرر -->
+        <div class="col-md-9">
+            <!-- الرأس (Header) - تعريف الورك فلو -->
+            <div class="card shadow-sm mb-3">
+                <div class="card-header bg-dark text-white">
+                    <h5>⚙️ تعريف الورك فلو (Workflow Header)</h5>
+                </div>
+                <div class="card-body">
+            <form id="workflowForm">
+                @Html.AntiForgeryToken()
+                <div class="row">
+                    <div class="col-md-6 mb-2">
+                        <label class="form-label">اسم الورك فلو (Workflow Name)</label>
+                        <input type="text" class="form-control" name="WorkflowName" required />
+                    </div>
+                    <div class="col-md-6 mb-2">
+                        <label class="form-label">وصف (Description)</label>
+                        <input type="text" class="form-control" name="Description" />
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-md-3 mb-2">
+                        <label class="form-label">المصدر (Source Table)</label>
+                        <select class="form-select" id="sourceTableSelect" onchange="loadDocTypes()">
+                            <option value="">-- اختر المصدر --</option>
+                            <!-- القائمة الأساسية الثابتة لضمان الظهور -->
+                            <optgroup label="المستندات الأساسية">
+                                <option value="TBL010">سندات (Bonds Transaction - TBL010)</option>
+                                <option value="TBL021">فواتير (Invoices Transaction - TBL021)</option>
+                                <option value="TBL085">أرشيف (Archive - TBL085)</option>
+                                <option value="TBL022">أوامر شغل (Job Orders - TBL022)</option>
+                                <option value="TBL013">مستخدمين (Users - TBL013)</option>
+                                <option value="TBL016">عملاء (Agents - TBL016)</option>
+                            </optgroup>
+                            
+                            <!-- القائمة الديناميكية من السيرفر -->
+                            @if (Model.SourceTables != null && Model.SourceTables.Any())
+                            {
+                                <optgroup label="باقي الجداول">
+                                    @foreach (var item in Model.SourceTables)
+                                    {
+                                        <option value="@item.Value">@item.Text</option>
+                                    }
+                                </optgroup>
+                            }
+                        </select>
+                    </div>
+                    <div class="col-md-3 mb-2">
+                        <label class="form-label">نوع المستند (Doc Type)</label>
+                        <select class="form-select" id="docTypeSelect" disabled>
+                            <option value="">-- اختر النوع --</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3 mb-2">
+                        <label class="form-label">الحدث (Trigger)</label>
+                        <select class="form-select" name="TriggerEvent">
+                            <option value="OnAfterInsert">بعد الإضافة (After Insert)</option>
+                            <option value="OnBeforeInsert">قبل الإضافة (Before Insert)</option>
+                            <option value="OnUpdate">عند التعديل (On Update)</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3 mb-2">
+                        <label class="form-label">الشرط (SQL Condition)</label>
+                        <input type="text" class="form-control" name="ConditionSql" placeholder="Amount > 5000" />
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- التفاصيل (Details) - خطوات الورك فلو -->
+    <div class="card shadow-sm">
+        <div class="card-header bg-primary text-white d-flex justify-content-between">
+            <h5>⚡ خطوات التنفيذ (Execution Steps)</h5>
+            <button class="btn btn-sm btn-light text-primary" onclick="addStepRow()">+ إضافة خطوة (Add Step)</button>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-bordered table-striped mb-0" id="stepsTable">
+                    <thead class="table-light">
+                        <tr>
+                            <th width="50">#</th>
+                            <th width="200">الإجراء (Action)</th>
+                            <th>التفاصيل / القيمة (Details/Value)</th>
+                            <th>الشرط الخاص (Step Condition)</th>
+                            <th width="80">حذف</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <!-- سيتم إضافة الأسطر هنا بواسطة JS -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        <div class="card-footer text-end">
+            <button type="button" class="btn btn-success btn-lg" onclick="saveWorkflow()">💾 حفظ الورك فلو بالكامل (Save All)</button>
+        </div>
+    </div>
+        </div> <!-- End col-md-9 -->
+    </div> <!-- End row -->
+</div>
+
+@section Scripts {
+    <!-- SweetAlert2 Library -->
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+    <script>
+        // دالة تحميل أنواع المستندات (AJAX)
+        async function loadDocTypes() {
+            var table = document.getElementById("sourceTableSelect").value;
+            var select = document.getElementById("docTypeSelect");
+            select.innerHTML = '<option value="">جار التحميل...</option>';
+            select.disabled = true;
+
+            if (!table) return;
+
+            try {
+                console.log('Fetching doc types for:', table);
+                const response = await fetch('?handler=DocTypes&table=' + table);
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                const data = await response.json();
+                console.log('Data received:', data);
+
+                if (data.error) {
+                    alert('خطأ من السيرفر: ' + data.error); // Show explicit alert
+                    select.innerHTML = '<option value="">خطأ في التحميل</option>';
+                    return;
+                }
+
+                if (data.length === 0) {
+                    select.innerHTML = '<option value="">(لا توجد أنواع - No Types)</option>';
+                    select.disabled = true;
+                    return;
+                }
+
+                select.innerHTML = '<option value="">-- اختر النوع --</option>';
+                data.forEach(item => {
+                    var option = document.createElement("option");
+                    option.value = item.value;
+                    option.text = item.text; 
+                    select.appendChild(option);
+                });
+                select.disabled = false;
+            } catch (error) {
+                console.error('Error:', error);
+                alert('خطأ في الاتصال: ' + error.message); // Show explicit alert
+                select.innerHTML = '<option value="">فشل الاتصال</option>';
+            }
+        }
+
+        // دالة إضافة سطر جديد (ديناميكية 100%)
+        function addStepRow() {
+            var table = document.getElementById("stepsTable").getElementsByTagName('tbody')[0];
+            var rowCount = table.rows.length + 1;
+            var row = table.insertRow();
+
+            // 1. الترتيب
+            row.insertCell(0).innerHTML = `<input type="number" class="form-control form-control-sm text-center" value="${rowCount}" readonly />`;
+
+            // 2. نوع الإجراء (Dropdown)
+            var actionCell = row.insertCell(1);
+            actionCell.innerHTML = `
+                <select class="form-select form-select-sm" onchange="updateDetailsInput(this)">
+                    <option value="">-- اختر --</option>
+                    <option value="SendEmail">إرسال إيميل (Send Email)</option>
+                    <option value="ExecuteProc">تشغيل بروسيجر (Execute Proc)</option>
+                    <option value="ChangeStage">تغيير مرحلة (Change Stage)</option>
+                    <option value="SetCostCenter">حمل مركز كلفة (Set Cost Center)</option>
+                </select>
+            `;
+
+            // 3. التفاصيل (Dynamic Input)
+            var detailsCell = row.insertCell(2);
+            detailsCell.innerHTML = `<input type="text" class="form-control form-control-sm" placeholder="القيمة..." />`;
+
+            // 4. الشرط
+            row.insertCell(3).innerHTML = `<input type="text" class="form-control form-control-sm" placeholder="شرط (اختياري)" />`;
+
+            // 5. حذف
+            row.insertCell(4).innerHTML = `<button class="btn btn-danger btn-sm" onclick="this.closest('tr').remove()">X</button>`;
+        }
+
+        // متغير لتخزين قائمة المستخدمين
+        var usersList = [];
+
+        // تحميل المستخدمين مرة واحدة عند فتح الصفحة
+        // نستخدم دالة مساعدة للتأكد من أن الـ fetch يعمل
+        async function loadUsers() {
+            try {
+                const response = await fetch('?handler=Users');
+                if (response.ok) {
+                    const data = await response.json();
+                    usersList = data;
+                }
+            } catch (error) {
+                console.error('Error loading users:', error);
+            }
+        }
+        loadUsers();
+
+        // دالة تحديث حقل التفاصيل بناءً على الإجراء (الذكاء السياقي)
+        function updateDetailsInput(selectElement) {
+            var row = selectElement.closest('tr');
+            var detailsCell = row.cells[2];
+            var actionType = selectElement.value;
+            var sourceTable = document.getElementById("sourceTableSelect").value;
+            
+            if (actionType === 'SendEmail') {
+                var options = '';
+
+                // 1. خيارات سياقية بناءً على المصدر
+                if (sourceTable === 'TBL009') {
+                    options += `<option value="Dynamic:BondAgent">العميل في السند (Bond Agent)</option>`;
+                    options += `<option value="Dynamic:BondCreator">منشئ السند (Bond Creator)</option>`;
+                } else if (sourceTable === 'TBL020') {
+                    options += `<option value="Dynamic:InvoiceCustomer">العميل في الفاتورة (Invoice Customer)</option>`;
+                    options += `<option value="Dynamic:InvoiceRep">المندوب (Sales Rep)</option>`;
+                }
+
+                // 2. خيارات عامة دائماً موجودة
+                options += `<option value="Dynamic:Manager">المدير المباشر (Direct Manager)</option>`;
+
+                // 3. إضافة المستخدمين الحقيقيين من TBL013
+                if (usersList.length > 0) {
+                    options += `<optgroup label="مستخدمين محددين (Specific Users)">`;
+                    usersList.forEach(user => {
+                        options += `<option value="${user.value}">${user.text}</option>`;
+                    });
+                    options += `</optgroup>`;
+                }
+                
+                detailsCell.innerHTML = `<select class="form-select form-select-sm">${options}</select>`;
+            } else if (actionType === 'ExecuteProc') {
+                detailsCell.innerHTML = `<input type="text" class="form-control form-control-sm" placeholder="اسم البروسيجر (Stored Proc Name)" />`;
+            } else {
+                detailsCell.innerHTML = `<input type="text" class="form-control form-control-sm" placeholder="القيمة..." />`;
+            }
+        }
+
+        function saveWorkflow() {
+            var form = document.getElementById("workflowForm");
+            var formData = new FormData(form);
+            
+            // جمع بيانات الجدول (الخطوات)
+            var steps = [];
+            var table = document.getElementById("stepsTable").getElementsByTagName('tbody')[0];
+            for (var i = 0; i < table.rows.length; i++) {
+                var row = table.rows[i];
+                var actionSelect = row.cells[1].getElementsByTagName('select')[0];
+                var detailsInput = row.cells[2].querySelector('input, select');
+                var conditionInput = row.cells[3].getElementsByTagName('input')[0];
+
+                if (actionSelect && actionSelect.value) {
+                    steps.push({
+                        StepOrder: i + 1,
+                        ActionType: actionSelect.value,
+                        SelectedValue: detailsInput ? detailsInput.value : '',
+                        StepCondition: conditionInput ? conditionInput.value : ''
+                    });
+                }
+            }
+
+            // إعداد كائن البيانات للإرسال
+            var payload = {
+                Name: formData.get("WorkflowName"),
+                Description: formData.get("Description"),
+                SourceTable: document.getElementById("sourceTableSelect").value,
+                SpecificDocTypeGuid: document.getElementById("docTypeSelect").value,
+                TriggerEvent: formData.get("TriggerEvent"),
+                ConditionSql: formData.get("ConditionSql"),
+                Steps: steps
+            };
+
+            // إرسال البيانات (AJAX POST)
+            // هام: يجب إرسال RequestVerificationToken في الهيدر
+            var tokenElement = document.querySelector('input[name="__RequestVerificationToken"]');
+            if (!tokenElement) {
+                Swal.fire('خطأ!', 'رمز الحماية غير موجود (Anti-Forgery Token Missing)', 'error');
+                return;
+            }
+            var token = tokenElement.value;
+
+            console.log('Sending Payload:', payload); // Debug Log
+
+            fetch('?handler=SaveWorkflow', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'RequestVerificationToken': token
+                },
+                body: JSON.stringify(payload)
+            })
+            .then(async response => {
+                const result = await response.json();
+                console.log('Response:', result); // Debug Log
+                
+                if (response.ok && result.success) {
+                    Swal.fire({
+                        title: 'تم الحفظ بنجاح! ✅',
+                        text: 'تم حفظ الورك فلو في قاعدة البيانات',
+                        icon: 'success',
+                        confirmButtonText: 'موافق'
+                    }).then((result) => {
+                        location.href = '/WorkflowMaster'; // Reload to show in list
+                    });
+                } else {
+                    Swal.fire({
+                        title: 'خطأ!',
+                        text: 'فشل الحفظ: ' + (result.error || 'Unknown Error'),
+                        icon: 'error',
+                        confirmButtonText: 'حاول مرة أخرى'
+                    });
+                }
+            })
+            .catch(error => {
+                console.error('Fetch Error:', error);
+                Swal.fire({
+                    title: 'خطأ اتصال!',
+                    text: 'تعذر الاتصال بالسيرفر',
+                    icon: 'error',
+                    confirmButtonText: 'موافق'
+                });
+            });
+        }
+    </script>
+}

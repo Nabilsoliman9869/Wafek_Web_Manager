@@ -1,0 +1,155 @@
+@page
+@model Wafek_Web_Manager.Pages.EmailCommandsModel
+@{
+    ViewData["Title"] = "Email Command Center";
+}
+
+<div class="container mt-4">
+    <div class="card shadow">
+        <div class="card-header bg-danger text-white">
+            <h4>📧 مركز الأوامر السحرية (*الكود*)</h4>
+            <small>عند استلام ميل يحتوي على كود (مثل *9009*) يُنفَّذ الأمر ويرد النظام بالنتيجة على البريد.</small>
+        </div>
+        <div class="card-body">
+            @if (!string.IsNullOrEmpty(Model.SimulateMessage))
+            {
+                <div class="alert @(Model.SimulateSuccess ? "alert-success" : "alert-danger")">@Model.SimulateMessage</div>
+            }
+
+            <div class="alert alert-info border-info mb-4 d-flex justify-content-between align-items-center flex-wrap gap-2">
+                <div>
+                    <h5 class="alert-heading mb-1">📬 استقبال تلقائي</h5>
+                    <p class="mb-0 small">الميول تُستقبل من IMAP تلقائياً. إذا لم يصل الميل، اضغط "جلب الآن".</p>
+                </div>
+                <form method="post" asp-page-handler="FetchImap" class="mb-0">
+                    <button type="submit" class="btn btn-success">⬇️ جلب الآن</button>
+                </form>
+            </div>
+
+            <!-- Simulate Inbound Email (للتجربة) -->
+            <form method="post" asp-page-handler="SimulateInbound" class="mb-4 p-3 bg-info bg-opacity-10 rounded border">
+                <h6>📥 محاكاة ميل وارد (للتجربة)</h6>
+                <p class="small text-muted">أدخل بريد المرسل والكود — سيُعالج خلال ~30 ثانية ويرسل الرد.</p>
+                <div class="row g-2 align-items-end">
+                    <div class="col-md-4">
+                        <input type="email" name="senderEmail" class="form-control" placeholder="البريد (مثل user@gmail.com)" required />
+                    </div>
+                    <div class="col-md-4">
+                        <input type="text" name="commandCode" class="form-control" placeholder="الكود (مثل *2002*)" required />
+                    </div>
+                    <div class="col-md-2">
+                        <button type="submit" class="btn btn-info">إرسال محاكاة</button>
+                    </div>
+                </div>
+            </form>
+
+            <!-- Add New Command / إضافة أمر سحري -->
+            <form method="post" asp-page-handler="Add" class="mb-4 p-3 bg-light rounded border">
+                <h6>➕ إضافة أمر سحري جديد</h6>
+                <p class="small text-muted">أدخل الكود (مثل *9009*) وعند استلام ميل يحتوي عليه سيُنفَّذ الأمر ويرد النظام بالنتيجة.</p>
+                <div class="row">
+                    <div class="col-md-2 mb-2">
+                        <label class="form-label small">الكود</label>
+                        <input type="text" name="code" class="form-control" placeholder="*9009*" required />
+                    </div>
+                    <div class="col-md-3 mb-2">
+                        <label class="form-label small">الوصف</label>
+                        <input type="text" name="desc" class="form-control" placeholder="تقرير الحسابات" required />
+                    </div>
+                    <div class="col-md-3 mb-2">
+                        <label class="form-label small">النوع</label>
+                        <select name="type" class="form-select">
+                            <option value="SQLQuery">استعلام SQL (يُرجع جدول)</option>
+                            <option value="StoredProc">إجراء مخزن (Stored Proc)</option>
+                            <option value="Backup">نسخ احتياطي</option>
+                        </select>
+                    </div>
+                    <div class="col-md-4 mb-2 d-flex align-items-end">
+                        <button type="submit" class="btn btn-danger btn-lg w-100 py-3">
+                            💾 حفظ الأمر
+                        </button>
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-md-12 mb-2">
+                        <label class="form-label small">محتوى التنفيذ (نص الاستعلام أو اسم الإجراء)</label>
+                        <textarea name="content" class="form-control font-monospace" rows="6" placeholder="SELECT ... FROM ... أو اسم الإجراء المخزن" required></textarea>
+                    </div>
+                    <div class="col-md-12">
+                        <button type="submit" class="btn btn-danger btn-lg px-5 py-3">
+                            💾 حفظ الأمر
+                        </button>
+                    </div>
+                </div>
+            </form>
+
+            <!-- سجل الميول الواردة (مخزنة في SQL) -->
+            <h6 class="mt-4">📬 سجل الميول الواردة (آخر 20)</h6>
+            <p class="small text-muted">الميول التي تم استلامها من IMAP أو المحاكاة — مخزنة في WF_EmailLogs</p>
+            <table class="table table-bordered table-sm table-hover">
+                <thead class="table-secondary">
+                    <tr>
+                        <th>#</th>
+                        <th>المرسل</th>
+                        <th>الموضوع</th>
+                        <th>الكود</th>
+                        <th>الحالة</th>
+                        <th>التاريخ</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (Model.EmailLogs.Count == 0)
+                    {
+                        <tr><td colspan="6" class="text-muted text-center">لا توجد سجلات</td></tr>
+                    }
+                    @foreach (var log in Model.EmailLogs)
+                    {
+                        <tr>
+                            <td>@log.Id</td>
+                            <td><small>@log.SenderEmail</small></td>
+                            <td><small>@log.Subject</small></td>
+                            <td><span class="badge bg-danger">@(string.IsNullOrEmpty(log.DetectedCommand) ? "—" : log.DetectedCommand)</span></td>
+                            <td>
+                                <span class="badge @(log.ExecutionStatus == "Success" ? "bg-success" : log.ExecutionStatus == "Pending" ? "bg-warning text-dark" : log.ExecutionStatus == "NoCommand" ? "bg-secondary" : "bg-danger")">
+                                    @log.ExecutionStatus
+                                </span>
+                            </td>
+                            <td><small>@log.ReceivedDate</small></td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+
+            <!-- قائمة الأوامر المحفوظة -->
+            <h6 class="mt-4">📋 الأوامر المحفوظة</h6>
+            <table class="table table-bordered table-hover">
+                <thead class="table-dark">
+                    <tr>
+                        <th>الكود</th>
+                        <th>الوصف</th>
+                        <th>النوع</th>
+                        <th>محتوى التنفيذ</th>
+                        <th>إجراء</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var cmd in Model.Commands)
+                    {
+                        <tr>
+                            <td class="fw-bold text-danger">@cmd.Code</td>
+                            <td>@cmd.Description</td>
+                            <td><span class="badge bg-secondary">@cmd.Type</span></td>
+                            <td><code class="small text-break" style="max-width:300px" title="@(cmd.Content ?? "")">@(cmd.Content != null && cmd.Content.Length > 80 ? cmd.Content.Substring(0, 80) + "…" : (cmd.Content ?? ""))</code></td>
+                            <td>
+                                <form method="post" asp-page-handler="Delete">
+                                    <input type="hidden" name="id" value="@cmd.Id" />
+                                    <button class="btn btn-sm btn-outline-danger" onclick="return confirm('Delete?');">🗑️</button>
+                                </form>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>

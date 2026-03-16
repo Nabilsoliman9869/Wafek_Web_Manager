@@ -1,0 +1,240 @@
+@page "{id:int?}"
+@model Wafek_Web_Manager.Pages.WorkflowDesignerModel
+@{
+    ViewData["Title"] = "Workflow Designer";
+}
+
+@if (Model.SelectedWorkflow == null)
+{
+    <div class="alert alert-warning">Workflow not found.</div>
+}
+else
+{
+    <div class="container-fluid mt-3">
+        <!-- Header: Workflow Definition -->
+        <div class="card mb-3">
+            <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">
+                    <span class="badge bg-success me-2">#@Model.SelectedWorkflow.Id</span>
+                    @Model.SelectedWorkflow.Name
+                </h5>
+                <div>
+                    <span class="badge bg-info">@Model.SelectedWorkflow.SourceTable (@Model.SelectedWorkflow.TriggerEvent)</span>
+                    <a asp-page="./WorkflowCreate" class="btn btn-sm btn-outline-light ms-2">New Workflow</a>
+                </div>
+            </div>
+            <div class="card-body p-2">
+                <div class="row text-muted small">
+                    <div class="col-md-6"><strong>Condition:</strong> <code>@Model.SelectedWorkflow.ConditionSql</code></div>
+                    <div class="col-md-6"><strong>Description:</strong> @Model.SelectedWorkflow.Description</div>
+                </div>
+                <hr class="my-2"/>
+                <div class="accordion" id="accordionFormat">
+                    <div class="accordion-item">
+                        <h2 class="accordion-header">
+                            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseFormat" aria-expanded="false">شكل إرسال الميل (EmailFormatQuery) — استعلام لعرض المستند في الميل</button>
+                        </h2>
+                        <div id="collapseFormat" class="accordion-collapse collapse" data-bs-parent="#accordionFormat">
+                            <div class="accordion-body">
+<p class="small text-muted">استعلام SQL يُنفّذ عند إرسال ميل الموافقة. استخدم <code>@@CardGuide</code> أو <code>@@SourceId</code> أو <code>@@BondGuide</code>. النتيجة تُحوّل لجدول HTML كما في *9009. راجع SQL/EmailFormatQuery_Bond_TBL011.sql.</p>
+                                    <form method="post" asp-page-handler="SaveFormatQuery">
+                                    <input type="hidden" name="WorkflowId" value="@Model.SelectedWorkflow.Id"/>
+                                    <textarea name="EmailFormatQuery" class="form-control font-monospace small" rows="8" placeholder="SELECT ... FROM TBL012 ... WHERE MainGuide IN (SELECT CardGuide FROM TBL010 WHERE CardGuide = @@CardGuide)">@(Model.SelectedWorkflow.EmailFormatQuery ?? "")</textarea>
+                                    <button type="submit" class="btn btn-sm btn-success mt-2">حفظ شكل الإرسال</button>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Body: Steps Grid (Inline Editing) -->
+        <div class="card shadow-sm">
+            <div class="card-header bg-light">
+                <strong>⚡ Workflow Steps (Execution Sequence)</strong>
+                <small class="text-muted ms-2">— لخطوات «إرسال ميل» استخدم زر ⚙️ توابع لإعداد الموافقة/الرفض</small>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-bordered table-hover mb-0 align-middle">
+                        <thead class="table-light">
+                            <tr>
+                                <th style="width: 50px;">#</th>
+                                <th style="width: 200px;">Action Type</th>
+                                <th style="width: 200px;">Step Name</th>
+                                <th>Details / Parameters</th>
+                                <th>Condition (Step Level)</th>
+                                <th style="width: 100px;">إعداد التوابع / Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <!-- Existing Steps -->
+                            @foreach (var step in Model.Steps)
+                            {
+                                <tr>
+                                    <td class="text-center fw-bold">@step.StepOrder</td>
+                                    <td><span class="badge bg-secondary">@step.ActionType</span></td>
+                                    <td>@step.StepName</td>
+                                    <td>
+                                        <!-- Display Logic based on Action Type -->
+                                        @if (step.ActionType == "ChangeSecurity") { <span>Security Level: @step.SelectedValue</span> }
+                                        else if (step.ActionType == "ChangeStage") { <span>Move to Stage: @step.SelectedValue</span> }
+                                        else if (step.ActionType == "SendEmail") { <span>Recipient: @step.SelectedValue</span> }
+                                        else if (step.ActionType == "ExecuteProc") { <span>Exec: @step.SelectedValue</span> }
+                                        else { <span>@step.SelectedValue</span> }
+                                    </td>
+                                    <td><code>@step.StepCondition</code></td>
+                                    <td>
+                                        @if (step.ActionType == "SendEmail")
+                                        {
+                                            <a asp-page="/WorkflowStepConfig" asp-route-stepId="@step.Id" class="btn btn-sm btn-info me-1" title="إعداد توابع الموافقة/الرفض">⚙️ توابع</a>
+                                        }
+                                        <form method="post" asp-page-handler="DeleteStep" class="d-inline">
+                                            <input type="hidden" name="id" value="@step.Id" />
+                                            <input type="hidden" name="wfId" value="@Model.SelectedWorkflow.Id" />
+                                            <button class="btn btn-sm btn-danger" onclick="return confirm('Delete step?');">X</button>
+                                        </form>
+                                    </td>
+                                </tr>
+                            }
+
+                            <!-- New Step Row (Inline Form) -->
+                            <tr class="table-warning">
+                                <form method="post" asp-page-handler="AddStep">
+                                    <input type="hidden" name="WorkflowId" value="@Model.SelectedWorkflow.Id" />
+                                    <td>
+                                        <input type="number" name="StepOrder" class="form-control form-control-sm text-center" value="@(Model.Steps.Count + 1)" required />
+                                    </td>
+                                    <td>
+                                        <select name="ActionType" id="newActionType" class="form-select form-select-sm" onchange="updateDetailsField()" required>
+                                            <option value="">-- Select Action --</option>
+                                            @foreach (var item in Model.ActionTypes)
+                                            {
+                                                <option value="@item.Value">@item.Text</option>
+                                            }
+                                        </select>
+                                    </td>
+                                    <td>
+                                        <input type="text" name="StepName" class="form-control form-control-sm" placeholder="Step Name" />
+                                    </td>
+                                    <td id="detailsCell">
+                                        <!-- Dynamic Inputs will appear here -->
+                                        <input type="text" name="SelectedValue" class="form-control form-control-sm" placeholder="Value..." />
+                                    </td>
+                                    <td>
+                                        <input type="text" name="StepCondition" class="form-control form-control-sm" placeholder="e.g. Amount > 5000" />
+                                    </td>
+                                    <td>
+                                        <button type="submit" class="btn btn-sm btn-success w-100">Add</button>
+                                    </td>
+                                </form>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Hidden Lists for JavaScript -->
+    <div style="display:none;">
+        <select id="listStages">
+            <option value="">-- Select Stage --</option>
+            @foreach (var item in Model.Stages) { <option value="@item.Value">@item.Text</option> }
+        </select>
+        <select id="listCostCenters">
+            <option value="">-- Select Cost Center --</option>
+            @foreach (var item in Model.CostCenters) { <option value="@item.Value">@item.Text</option> }
+        </select>
+        <select id="listProjects">
+            <option value="">-- Select Project --</option>
+            @foreach (var item in Model.Projects) { <option value="@item.Value">@item.Text</option> }
+        </select>
+        <select id="listSecurity">
+            <option value="">-- Select Level --</option>
+            @foreach (var item in Model.SecurityLevels) { <option value="@item.Value">@item.Text</option> }
+        </select>
+        <select id="listEmailRecipients">
+            <option value="">-- Select Recipient --</option>
+            @foreach (var item in Model.EmailRecipients) { <option value="@item.Value">@item.Text</option> }
+        </select>
+    </div>
+
+    <script>
+        function updateDetailsField() {
+            var actionType = document.getElementById("newActionType").value;
+            var cell = document.getElementById("detailsCell");
+            cell.innerHTML = ""; // Clear current input
+
+            var inputName = "SelectedValue";
+            var className = "form-select form-select-sm";
+
+            if (actionType === "ChangeSecurity") {
+                var select = document.getElementById("listSecurity").cloneNode(true);
+                select.name = inputName;
+                select.className = className;
+                select.style.display = "block";
+                select.id = "";
+                cell.appendChild(select);
+            }
+            else if (actionType === "ChangeStage") {
+                var select = document.getElementById("listStages").cloneNode(true);
+                select.name = inputName;
+                select.className = className;
+                select.style.display = "block";
+                select.id = "";
+                cell.appendChild(select);
+            }
+            else if (actionType === "SendEmail") {
+                var select = document.getElementById("listEmailRecipients").cloneNode(true);
+                select.name = inputName;
+                select.className = className;
+                select.style.display = "block";
+                select.id = "";
+                cell.appendChild(select);
+            }
+            else if (actionType === "SetCostCenter") {
+                var select = document.getElementById("listCostCenters").cloneNode(true);
+                select.name = inputName;
+                select.className = className;
+                select.style.display = "block";
+                select.id = "";
+                cell.appendChild(select);
+            }
+            else if (actionType === "SetProject") {
+                var select = document.getElementById("listProjects").cloneNode(true);
+                select.name = inputName;
+                select.className = className;
+                select.style.display = "block";
+                select.id = "";
+                cell.appendChild(select);
+            }
+            else if (actionType === "ExecuteProc") {
+                var input = document.createElement("input");
+                input.type = "text";
+                input.name = inputName;
+                input.className = "form-control form-control-sm";
+                input.placeholder = "Enter Procedure Name (e.g. SP_PostBond)";
+                cell.appendChild(input);
+            }
+            else if (actionType === "ExecuteFunction") {
+                var input = document.createElement("input");
+                input.type = "text";
+                input.name = inputName;
+                input.className = "form-control form-control-sm";
+                input.placeholder = "Function Name (e.g. fn_CheckLimit)";
+                cell.appendChild(input);
+            }
+            else {
+                // Default Text Input
+                var input = document.createElement("input");
+                input.type = "text";
+                input.name = inputName;
+                input.className = "form-control form-control-sm";
+                input.placeholder = "Details / Value...";
+                cell.appendChild(input);
+            }
+        }
+    </script>
+}

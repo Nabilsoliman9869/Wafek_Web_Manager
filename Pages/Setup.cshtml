@@ -1,0 +1,145 @@
+@page
+@model Wafek_Web_Manager.Pages.SetupModel
+@{
+    ViewData["Title"] = "System Setup";
+}
+
+<div class="container mt-5">
+    <div class="card shadow">
+        <div class="card-header bg-primary text-white">
+            <h3>⚙️ Wafek Workflow System Setup</h3>
+        </div>
+        <div class="card-body">
+            @if (!string.IsNullOrEmpty(Model.Message))
+            {
+                <div class="alert @(Model.IsSuccess ? "alert-success" : "alert-danger")" role="alert">
+                    @Model.Message
+                </div>
+            }
+
+            <form method="post">
+                <h5 class="text-secondary border-bottom pb-2">📡 Database Connection</h5>
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">Server Name / IP</label>
+                        <input type="text" class="form-control" asp-for="DbServer" placeholder="e.g. localhost" required />
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">Database Name</label>
+                        <input type="text" class="form-control" asp-for="DbName" placeholder="e.g. WafekDB" required />
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">User ID</label>
+                        <input type="text" class="form-control" asp-for="DbUser" placeholder="e.g. sa" required />
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">Password</label>
+                        <input type="password" class="form-control" asp-for="DbPassword" value="@Model.DbPassword" required />
+                    </div>
+                </div>
+
+                <div class="d-flex justify-content-end mb-4">
+                    <button type="submit" asp-page-handler="TestConnection" class="btn btn-info text-white me-2">
+                        Test DB Connection
+                    </button>
+                    <button type="submit" asp-page-handler="Initialize" class="btn btn-success" 
+                            onclick="return confirm('This will create/update system tables in the database. Continue?');">
+                        Initialize DB Schema
+                    </button>
+                </div>
+
+                <h5 class="text-secondary border-bottom pb-2 mt-4">📧 Email Settings (SMTP)</h5>
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">SMTP Server</label>
+                        <input type="text" class="form-control" asp-for="SmtpServer" placeholder="e.g. smtp.gmail.com" />
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <label class="form-label">Port</label>
+                        <input type="number" class="form-control" asp-for="SmtpPort" placeholder="587" />
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <div class="form-check mt-4">
+                            <input class="form-check-input" type="checkbox" asp-for="EnableSsl" id="sslCheck" checked>
+                            <label class="form-check-label" for="sslCheck">Enable SSL</label>
+                        </div>
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">Sender Email</label>
+                        <input type="email" class="form-control" asp-for="SenderEmail" placeholder="notifications@company.com" />
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">Email Password</label>
+                        <input type="password" class="form-control" asp-for="SenderPassword" placeholder="App Password (Gmail)" autocomplete="off" />
+                        <small class="text-muted">Gmail: استخدم App Password من إعدادات الحساب. عند التجربة يُستخدم من الملف المحفوظ إذا كان الحقل فارغاً.</small>
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">رابط الموافقة (ApproveBaseUrl)</label>
+                        <input type="url" class="form-control" asp-for="ApproveBaseUrl" placeholder="https://your-domain.com" id="approveBaseUrl" />
+                        <small class="text-muted">الرابط العام للتطبيق — عند الضغط على «عرض» في الميل يفتح هذا الرابط. <strong class="text-danger">لا تستخدم localhost</strong> — ضع رابط السيرفر العام (مثل https://wafek.YourCompany.com).</small>
+                        <div class="alert alert-warning mt-1 py-2 small mb-0" id="localhostWarn" style="display:none">⚠️ localhost لا يعمل للمستلمين — استخدم رابطاً عاماً.</div>
+                    </div>
+                    <script>document.getElementById('approveBaseUrl')?.addEventListener('input', function(){ document.getElementById('localhostWarn').style.display = (this.value||'').toLowerCase().includes('localhost') ? 'block' : 'none'; }); if((document.getElementById('approveBaseUrl')?.value||'').includes('localhost')) document.getElementById('localhostWarn').style.display='block';</script>
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">رابط بديل (ApproveUrlOverride) — اختياري</label>
+                        <input type="text" class="form-control" asp-for="ApproveUrlOverride" placeholder="https://app.com/Approve?ref={logId}" />
+                        <small class="text-muted">إذا وافق الأصلي يستخدم رابطاً مختلفاً، ضعه هنا مع {logId} كبديل لرقم السجل.</small>
+                    </div>
+                </div>
+
+                <h5 class="text-secondary border-bottom pb-2 mt-4">📥 استقبال الميل الوارد (IMAP)</h5>
+                <p class="text-muted small">يُستخدم لاستقبال الميل فعلياً وتسجيله في قاعدة البيانات، ثم تنفيذ الأوامر السحرية والرد على المرسل.</p>
+                <div class="row">
+                    <div class="col-md-12 mb-3">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" asp-for="ImapEnabled" id="imapEnabled">
+                            <label class="form-check-label" for="imapEnabled">تفعيل استقبال الميل من صندوق البريد</label>
+                        </div>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">خادم IMAP</label>
+                        <input type="text" class="form-control" asp-for="ImapServer" placeholder="imap.gmail.com" />
+                        <small class="text-muted">Gmail: imap.gmail.com — نفس الحساب المستخدم في SMTP أعلاه.</small>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <label class="form-label">منفذ IMAP</label>
+                        <input type="number" class="form-control" asp-for="ImapPort" placeholder="993" />
+                        <small class="text-muted">عادة 993 (SSL).</small>
+                    </div>
+                </div>
+
+                <div class="d-flex justify-content-end mb-2">
+                    <button type="submit" asp-page-handler="SaveSettings" class="btn btn-primary">
+                        💾 Save Settings
+                    </button>
+                </div>
+                <p class="small text-muted mb-2">
+                    <strong>كلمة مرور البريد:</strong> ضعها في حقل «Email Password» أعلاه واضغط <strong>Save Settings</strong> — مطلوبة لـ SMTP (إرسال) و IMAP (استقبال).
+                </p>
+
+            </form>
+
+            <hr />
+            <form method="post" asp-page-handler="TestImap" class="mb-3">
+                <button type="submit" class="btn btn-outline-primary">🔌 اختبار اتصال IMAP</button>
+                <span class="small text-muted ms-2">— تأكد تفعيل IMAP في Gmail (إعدادات → إعادة توجيه وIMAP)</span>
+            </form>
+            <form method="post" asp-page-handler="TestEmail" class="row g-2 align-items-end">
+                <div class="col-auto">
+                    <label class="form-label small mb-0">إرسال اختبار إلى:</label>
+                    <input type="email" class="form-control form-control-sm" asp-for="TestRecipientEmail" placeholder="@Model.SenderEmail" style="min-width:220px" />
+                </div>
+                <div class="col-auto">
+                    <button type="submit" class="btn btn-warning text-dark">📨 إرسال ميل اختبار</button>
+                </div>
+                <div class="col-auto small text-muted">(فارغ = نفس المرسل)</div>
+            </form>
+        </div>
+    </div>
+</div>

@@ -1,0 +1,36 @@
+# Wafek_Web_Manager — Render Blueprint
+# رفع على https://dashboard.render.com ثم New > Blueprint
+services:
+  - type: web
+    runtime: docker
+    name: wafek-manager
+    region: frankfurt
+    plan: starter
+
+    # متغيرات بيئية — اضبط القيم في لوحة Render بعد النشر
+    envVars:
+      - key: APPROVE_BASE_URL
+        sync: false
+        # القيمة = رابط التطبيق بعد النشر، مثال: https://wafek-manager.onrender.com
+      - key: DB_SERVER
+        sync: false
+      - key: DB_NAME
+        sync: false
+      - key: DB_USER
+        sync: false
+      - key: DB_PASSWORD
+        sync: false
+      - key: SMTP_SERVER
+        value: smtp.gmail.com
+      - key: SMTP_PORT
+        value: "587"
+      - key: SENDER_EMAIL
+        sync: false
+      - key: SENDER_PASSWORD
+        sync: false
+      - key: IMAP_SERVER
+        value: imap.gmail.com
+      - key: IMAP_PORT
+        value: "993"
+      - key: IMAP_ENABLED
+        value: "true"

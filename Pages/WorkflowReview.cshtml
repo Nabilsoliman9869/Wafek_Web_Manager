@@ -1,0 +1,147 @@
+@page "{id:int?}"
+@model Wafek_Web_Manager.Pages.WorkflowReviewModel
+@{
+    ViewData["Title"] = "مراجعة الورك فلو #" + Model.WorkflowId;
+}
+
+<div class="container-fluid mt-3">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h4>مراجعة الورك فلو #@Model.WorkflowId</h4>
+        <a asp-page="/WorkflowDesigner" asp-route-id="@Model.WorkflowId" class="btn btn-primary">فتح المصمم</a>
+    </div>
+
+    @if (Model.Definition == null)
+    {
+        <div class="alert alert-danger">لم يتم العثور على الورك فلو رقم @Model.WorkflowId</div>
+    }
+    else
+    {
+
+    <!-- تعريف الورك فلو -->
+    <div class="card mb-4">
+        <div class="card-header bg-dark text-white">
+            <h5 class="mb-0">📋 تعريف الورك فلو</h5>
+        </div>
+        <div class="card-body">
+            <table class="table table-sm">
+                <tr>
+                    <th style="width:180px">الاسم</th>
+                    <td>@Model.Definition.Name</td>
+                </tr>
+                <tr>
+                    <th>الوصف</th>
+                    <td>@(Model.Definition.Description ?? "—")</td>
+                </tr>
+                <tr>
+                    <th>الجدول المصدر (SourceTable)</th>
+                    <td><code>@Model.Definition.SourceTable</code></td>
+                </tr>
+                <tr>
+                    <th>حدث التشغيل (TriggerEvent)</th>
+                    <td><code>@Model.Definition.TriggerEvent</code></td>
+                </tr>
+                <tr>
+                    <th>شرط SQL</th>
+                    <td><code>@(Model.Definition.ConditionSql ?? "—")</code></td>
+                </tr>
+                <tr>
+                    <th>مُفعّل</th>
+                    <td>@(Model.Definition.IsActive ? "نعم ✅" : "لا ❌")</td>
+                </tr>
+            </table>
+        </div>
+    </div>
+
+    <!-- الإجراءات المخزنة المرتبطة -->
+    <div class="card mb-4">
+        <div class="card-header bg-info text-white">
+            <h5 class="mb-0">⚙️ الإجراءات المخزنة (Procedures)</h5>
+        </div>
+        <div class="card-body">
+            <p>يُستدعى الورك فلو عند حدوث حدث على الجدول <strong>@Model.Definition.SourceTable</strong>:</p>
+            <ul>
+                <li><code>EXEC Approve_CreateFirstProcess '@Model.Definition.SourceTable', '{GUID}', '@Model.Definition.TriggerEvent'</code></li>
+            </ul>
+            <p class="text-muted small mb-0">يقوم هذا الإجراء بإدخال سجل في <code>WF_Logs</code> واستدعاء <code>Approve_ExecuteStep</code> للخطوة الأولى.</p>
+        </div>
+    </div>
+
+    <!-- الخطوات والميل المرسل -->
+    <div class="card mb-4">
+        <div class="card-header bg-success text-white">
+            <h5 class="mb-0">📧 الخطوات — الميل المُرسل إليه</h5>
+        </div>
+        <div class="card-body p-0">
+            @if (Model.Steps == null || !Model.Steps.Any())
+            {
+                <p class="p-3 text-muted">لا توجد خطوات معرّفة.</p>
+            }
+            else
+            {
+                <table class="table table-hover mb-0">
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>اسم الخطوة</th>
+                            <th>نوع الأكشن</th>
+                            <th>المُرسل إليه (SelectedValue)</th>
+                            <th>الميل المُحلّل</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var s in Model.Steps)
+                        {
+                            <tr>
+                                <td>@s.StepOrder</td>
+                                <td>@s.StepName</td>
+                                <td><span class="badge bg-secondary">@s.ActionType</span></td>
+                                <td><code>@(s.SelectedValue ?? "—")</code></td>
+                                <td>
+                                    @if (s.ActionType == "SendEmail")
+                                    {
+                                        <span class="badge bg-primary">@(s.ResolvedEmail ?? "—")</span>
+                                        @if (!string.IsNullOrEmpty(s.EmailNote))
+                                        {
+                                            <small class="text-muted d-block">@s.EmailNote</small>
+                                        }
+                                    }
+                                    else
+                                    {
+                                        <span class="text-muted">—</span>
+                                    }
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            }
+        </div>
+    </div>
+
+    <!-- التريجر — ماذا يشغّل الورك فلو -->
+    <div class="card mb-4">
+        <div class="card-header bg-secondary text-white">
+            <h5 class="mb-0">⚡ التريجر — ماذا يشغّل الورك فلو؟</h5>
+        </div>
+        <div class="card-body">
+            <p>الورك فلو <strong>لا يعمل تلقائياً</strong> إلا إذا وُجد استدعاء لـ <code>Approve_CreateFirstProcess</code>.</p>
+            <p><strong>مصادر التريجر:</strong></p>
+            <ol>
+                <li><strong>تريجر SQL</strong> على جدول <code>@Model.Definition.SourceTable</code> — عند INSERT أو UPDATE (انظر <code>SQL/Wafek_Trigger_OnSourceTable.sql</code>)</li>
+                <li><strong>تطبيق Xtra</strong> — عند حفظ المستند من البرنامج الرئيسي</li>
+                <li><strong>استدعاء يدوي</strong> — للتجربة: <code>EXEC Approve_CreateFirstProcess '@Model.Definition.SourceTable', '{GUID-هنا}', '@Model.Definition.TriggerEvent'</code></li>
+            </ol>
+        </div>
+    </div>
+
+    <!-- الخدمة الخلفية -->
+    <div class="card">
+        <div class="card-header bg-warning text-dark">
+            <h5 class="mb-0">🔄 WorkflowEngineWorker</h5>
+        </div>
+        <div class="card-body">
+            <p>كل 10 ثوانٍ تبحث الخدمة عن سجلات <code>WF_Logs</code> ذات الحالة <strong>Pending</strong> وخطوة من نوع <strong>SendEmail</strong>، ثم ترسل ميلاً للمُرسل إليه (حسب <code>SelectedValue</code>).</p>
+        </div>
+    </div>
+    }
+</div>

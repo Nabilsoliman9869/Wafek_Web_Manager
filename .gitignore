@@ -1,0 +1,21 @@
+# Build
+bin/
+obj/
+*.user
+*.suo
+.vs/
+.vscode/
+
+# Secrets - لا تُرفع أبداً
+appsettings.custom.json
+appsettings.*.local.json
+keys/
+*.pfx
+
+# Logs
+*.log
+*.tmp
+
+# OS
+.DS_Store
+Thumbs.db

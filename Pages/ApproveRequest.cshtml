@@ -1,0 +1,139 @@
+@page "/ApproveRequest/{id:long?}"
+@model Wafek_Web_Manager.Pages.ApproveRequestModel
+@{
+    ViewData["Title"] = "طلب موافقة";
+    Layout = null;
+    var hasDocument = Model.Request != null && !string.IsNullOrEmpty(Model.Request.BondPrintHtml);
+}
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>طلب موافقة | نظام وافق</title>
+    <style>
+        * { box-sizing: border-box; }
+        body { margin: 0; padding: 24px; background: linear-gradient(135deg, #e8e8e8 0%, #f5f5f5 100%); font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; min-height: 100vh; }
+        .card { max-width: 720px; margin: 0 auto; background: #fff; border-radius: 16px; overflow: hidden; box-shadow: 0 8px 32px rgba(0,0,0,0.12); border: 4px solid #32b380; }
+        .card-header { background: linear-gradient(135deg, #32b380 0%, #2a9d6e 100%); color: #fff; padding: 20px 24px; font-size: 20px; font-weight: bold; }
+        .card-body { padding: 24px; }
+        .card-body p { margin: 10px 0; font-size: 15px; color: #333; }
+        .form-row { margin: 14px 0; }
+        .form-row label { display: block; font-weight: bold; margin-bottom: 6px; color: #333; }
+        .form-row select, .form-row textarea { width: 100%; padding: 10px 12px; font-size: 15px; border: 1px solid #ccc; border-radius: 8px; font-family: inherit; }
+        .form-row textarea { min-height: 80px; resize: vertical; }
+        .btn-wrap { display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; margin-top: 28px; }
+        .btn { display: inline-block; padding: 14px 28px; font-size: 17px; font-weight: bold; border: none; border-radius: 10px; cursor: pointer; text-decoration: none; transition: transform 0.2s, box-shadow 0.2s; }
+        .btn:hover { transform: translateY(-2px); }
+        .btn-save { background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%); color: #fff!important; }
+        .btn-cancel { background: #6b7280; color: #fff!important; }
+        .btn-show-card { background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); color: #fff!important; }
+        .logo-wrap { width: 100%; background: #fff; overflow: hidden; }
+        .logo-wrap img { width: 100%; max-width: 560px; height: auto; display: block; }
+        .alert { padding: 14px 18px; border-radius: 10px; margin-top: 20px; font-size: 15px; }
+        .alert-success { background: #dcfce7; color: #166534; border: 1px solid #22c55e; }
+        .alert-danger { background: #fee2e2; color: #991b1b; border: 1px solid #ef4444; }
+        .alert-info { background: #e0f2fe; color: #0369a1; border: 1px solid #0ea5e9; }
+        hr { border: none; border-top: 1px solid #e5e7eb; margin: 20px 0; }
+        .doc-block { margin: 20px 0; padding: 16px; background: #fff; border: 1px solid #ddd; border-radius: 10px; }
+        .no-print { }
+        @@media print {
+            .no-print { display: none !important; }
+            body { background: #fff; padding: 0; }
+            .card { box-shadow: none; border: 1px solid #333; }
+        }
+    </style>
+</head>
+<body>
+    @if (Model.Request == null)
+    {
+        <div class="alert @(Model.LogId == 0 ? "alert-info" : "alert-danger")" style="max-width:560px;margin:20px auto;padding:20px">
+            @if (Model.LogId == 0)
+            {
+                <strong>أدخل رقم الطلب في الرابط</strong><br/>
+                <span>مثال: <code>@("http://localhost:5246/ApproveRequest/123")</code></span><br/>
+                <small>رقم الطلب (123) يأتي من رابط الميل الذي أُرسل إليك.</small>
+            }
+            else
+            {
+                <span>لم يتم العثور على الطلب رقم @Model.LogId.</span>
+            }
+        </div>
+    }
+    else
+    {
+        <div class="card">
+            <div class="logo-wrap">
+                <img src="@Url.Content("~/images/TELLEWORK.jpg")" alt="Logo" onerror="this.style.display='none'" />
+            </div>
+            <div class="card-header">طلب موافقة | نظام وافق</div>
+            <div class="card-body">
+                <p><strong>رقم العملية:</strong> @Model.LogId</p>
+                <p><strong>إلى السيد:</strong> @Model.RecipientName</p>
+                <p><strong>نوع البطاقة (المصدر):</strong> @Model.Request.CardName</p>
+                <p><strong>رقم البطاقة:</strong> @Model.Request.CardNumber</p>
+                @if (!string.IsNullOrEmpty(Model.Request.BondDate)) { <p><strong>تاريخ السند:</strong> @Model.Request.BondDate</p> }
+                <p><strong>المرسل:</strong> @Model.Request.SenderName</p>
+                <p><strong>شركة:</strong> @Model.Request.CompanyName</p>
+                <p><strong>هاتف:</strong> @Model.Request.CompanyPhone</p>
+                <p><strong>ملاحظات الطلب:</strong> @Model.Request.Notes</p>
+
+                @if (hasDocument)
+                {
+                    <hr/>
+                    <div class="doc-block" id="document-print-area">
+                        <div class="bond-print-block">@Html.Raw(Model.Request!.BondPrintHtml)</div>
+                    </div>
+                }
+
+                <hr class="no-print"/>
+
+                <div class="no-print">
+                    <p style="font-weight:bold;margin-bottom:12px;font-size:16px">اختر أحد الخيارات ثم اضغط تأكيد:</p>
+                    <form method="post" asp-page-handler="Save" id="approval-form">
+                        <input type="hidden" name="logId" value="@Model.LogId" />
+                        <input type="hidden" name="state" id="state-input" value="" />
+                        <div class="btn-wrap" style="justify-content:flex-start;gap:12px;flex-direction:column;align-items:flex-start">
+                            <div style="display:flex;flex-wrap:wrap;gap:12px;align-items:center">
+                                <button type="button" class="btn btn-option btn-save" data-value="Approved" onclick="selectOption(this,'Approved')">1 موافق</button>
+                                <button type="button" class="btn btn-option" style="background:linear-gradient(135deg,#ef4444 0%,#dc2626 100%);color:#fff!important" data-value="Rejected" onclick="selectOption(this,'Rejected')">2 غير موفق</button>
+                                <button type="button" class="btn btn-option" style="background:linear-gradient(135deg,#f59e0b 0%,#d97706 100%);color:#fff!important" data-value="Postponed" onclick="selectOption(this,'Postponed')">3 يؤجل</button>
+                            </div>
+                            <div style="display:flex;gap:12px;align-items:center;margin-top:8px">
+                                <button type="submit" class="btn btn-confirm" id="btn-confirm" disabled style="background:linear-gradient(135deg,#2563eb 0%,#1d4ed8 100%);color:#fff!important;padding:16px 32px;font-size:18px">
+                                    ✓ تأكيد الإرسال
+                                </button>
+                                @if (hasDocument)
+                                {
+                                    <button type="button" onclick="window.print()" class="btn btn-show-card">🖨️ طباعة</button>
+                                }
+                            </div>
+                        </div>
+                    </form>
+                    <p id="selection-hint" style="font-size:13px;color:#666;margin-top:8px;display:none">تم اختيار: <strong id="selection-text"></strong></p>
+                    <script>
+                        function selectOption(btn, value) {
+                            document.querySelectorAll('.btn-option').forEach(function(b) {
+                                b.classList.remove('selected');
+                                b.style.boxShadow = '';
+                            });
+                            btn.classList.add('selected');
+                            btn.style.boxShadow = '0 0 0 4px #32b380';
+                            document.getElementById('state-input').value = value;
+                            document.getElementById('btn-confirm').disabled = false;
+                            var texts = { Approved: 'موافق', Rejected: 'غير موفق', Postponed: 'يؤجل' };
+                            document.getElementById('selection-text').textContent = texts[value];
+                            document.getElementById('selection-hint').style.display = 'block';
+                        }
+                    </script>
+                </div>
+
+                @if (!string.IsNullOrEmpty(Model.Message))
+                {
+                    <div class="alert @(Model.IsSuccess ? "alert-success" : "alert-danger")">@Model.Message</div>
+                }
+            </div>
+        </div>
+    }
+</body>
+</html>

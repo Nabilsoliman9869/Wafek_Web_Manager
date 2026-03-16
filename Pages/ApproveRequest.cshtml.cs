@@ -1,0 +1,250 @@
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.RazorPages;
+using Microsoft.Data.SqlClient;
+using Wafek_Web_Manager.Services;
+
+namespace Wafek_Web_Manager.Pages
+{
+    public class ApproveRequestModel : PageModel
+    {
+        private readonly Wafek_Web_Manager.Services.ResponseActionExecutor? _responseExecutor;
+
+        public ApproveRequestModel(Wafek_Web_Manager.Services.ResponseActionExecutor? responseExecutor = null)
+        {
+            _responseExecutor = responseExecutor;
+        }
+
+        private string GetConnectionString()
+        {
+            try
+            {
+                if (System.IO.File.Exists("appsettings.custom.json"))
+                {
+                    var json = System.IO.File.ReadAllText("appsettings.custom.json");
+                    var s = System.Text.Json.JsonSerializer.Deserialize<System.Text.Json.JsonElement>(json);
+                    var server = s.GetProperty("DbServer").GetString();
+                    var db = s.GetProperty("DbName").GetString();
+                    var user = s.GetProperty("DbUser").GetString();
+                    var pass = s.GetProperty("DbPassword").GetString();
+                    return $"Server={server};Database={db};User Id={user};Password={pass};TrustServerCertificate=True;Encrypt=True;";
+                }
+            }
+            catch { }
+            return "";
+        }
+
+        public long LogId { get; set; }
+        public ApproveRequestDto? Request { get; set; }
+        public string RecipientName { get; set; } = "";
+        public string Message { get; set; } = "";
+        public bool IsSuccess { get; set; }
+
+        public IActionResult OnGet(long? id)
+        {
+            if (id == null || id == 0)
+            {
+                LogId = 0;
+                Request = null;
+                return Page();
+            }
+            LogId = id.Value;
+            LoadRequest();
+            return Page();
+        }
+
+        public IActionResult OnPostApprove(long logId)
+        {
+            LogId = logId;
+            ProcessResponse(logId, "Approved", null);
+            LoadRequest();
+            Message = "تمت الموافقة بنجاح.";
+            IsSuccess = true;
+            return Page();
+        }
+
+        public IActionResult OnPostReject(long logId)
+        {
+            LogId = logId;
+            ProcessResponse(logId, "Rejected", null);
+            LoadRequest();
+            Message = "تم الرفض.";
+            IsSuccess = false;
+            return Page();
+        }
+
+        public IActionResult OnPostPostpone(long logId)
+        {
+            LogId = logId;
+            ProcessResponse(logId, "Postponed", null);
+            LoadRequest();
+            Message = "تم التأجيل. سيُعاد عرض الطلب لاحقاً.";
+            IsSuccess = true;
+            return Page();
+        }
+
+        /// <summary>حفظ حسب الحالة المختارة — نمط وافق الأصلي (قائمة منسدلة + حفظ)</summary>
+        public IActionResult OnPostSave(long logId, string state, string? responseText)
+        {
+            LogId = logId;
+            var responseType = state?.Trim() switch
+            {
+                "Approved" or "موافق" or "1" => "Approved",
+                "Rejected" or "غير موفق" or "إرجاع" or "2" => "Rejected",
+                "Postponed" or "يؤجل" or "انتظار" or "3" => "Postponed",
+                _ => "Postponed"
+            };
+            ProcessResponse(logId, responseType, responseText);
+            LoadRequest();
+            Message = responseType switch
+            {
+                "Approved" => "تمت الموافقة بنجاح.",
+                "Rejected" => "تم الرفض.",
+                _ => "تم التأجيل. سيُعاد عرض الطلب لاحقاً."
+            };
+            IsSuccess = responseType != "Rejected";
+            return Page();
+        }
+
+        private void LoadRequest()
+        {
+            var connStr = GetConnectionString();
+            if (string.IsNullOrEmpty(connStr)) return;
+
+            try
+            {
+                using var conn = new SqlConnection(connStr);
+                conn.Open();
+
+                using var cmd = new SqlCommand(@"
+                    SELECT L.Id, L.SourceRecordId, L.WorkflowDefinitionId, L.CurrentStepOrder,
+                           D.SourceTable, S.SelectedValue
+                    FROM WF_Logs L
+                    JOIN WF_Definitions D ON D.Id = L.WorkflowDefinitionId
+                    JOIN WF_Steps S ON S.WorkflowDefinitionId = L.WorkflowDefinitionId AND S.StepOrder = L.CurrentStepOrder
+                    WHERE L.Id = @id", conn);
+                cmd.Parameters.AddWithValue("@id", LogId);
+                using var r = cmd.ExecuteReader();
+                if (!r.Read()) return;
+
+                var sourceId = r.GetGuid(1);
+                var sourceTable = r.GetString(4);
+                var selectedValue = r.IsDBNull(5) ? "" : r.GetString(5);
+
+                var builder = new EmailBodyBuilder(connStr);
+                var docData = builder.GetDocumentData(sourceId, sourceTable);
+
+                RecipientName = ResolveRecipientName(conn, selectedValue);
+                Request = new ApproveRequestDto
+                {
+                    CardName = docData.CardName ?? sourceTable,
+                    CardNumber = docData.CardNumber ?? "",
+                    SenderName = docData.SenderName ?? "",
+                    CompanyName = docData.CompanyName ?? "",
+                    CompanyPhone = docData.CompanyPhone ?? "",
+                    Notes = docData.Notes ?? "",
+                    BondDate = docData.BondDate != default ? docData.BondDate.ToString("yyyy-MM-dd") : "",
+                    BranchName = docData.BranchName ?? "",
+                    CostCenterName = docData.CostCenterName ?? "",
+                    ProjectName = docData.ProjectName ?? "",
+                    CurrencyName = docData.CurrencyName ?? "",
+                    AccountName = docData.AccountName ?? "",
+                    TotalAmount = docData.TotalAmount ?? "",
+                    BondPrintHtml = docData.SourceTable == "TBL010" ? EmailBodyBuilder.BuildBondPrintBlock(docData)
+                    : docData.SourceTable == "TBL022" ? EmailBodyBuilder.BuildInvoicePrintBlock(docData) : ""
+                };
+            }
+            catch { }
+        }
+
+        private static string ResolveRecipientName(SqlConnection conn, string rule)
+        {
+            if (string.IsNullOrEmpty(rule)) return "";
+            var val = rule.Trim();
+            if (val.StartsWith("User:", StringComparison.OrdinalIgnoreCase)) val = val.Substring(5).Trim();
+            if (!Guid.TryParse(val, out var g)) return "";
+            try
+            {
+                var cmd = new SqlCommand("SELECT UserName FROM TBL013 WHERE UsGuide = @u", conn);
+                cmd.Parameters.AddWithValue("@u", g);
+                var r = cmd.ExecuteScalar();
+                if (r != null && !string.IsNullOrEmpty(r.ToString())) return r.ToString();
+                cmd.CommandText = "SELECT TBL016.AgentName FROM TBL016 JOIN TBL013 ON TBL013.RelatedAgent = TBL016.CardGuide WHERE TBL013.UsGuide = @u";
+                r = cmd.ExecuteScalar();
+                return r?.ToString() ?? "";
+            }
+            catch { return ""; }
+        }
+
+        /// <summary>
+        /// معالجة الرد — من ActionConfigJson إن وُجد، وإلا من الإجراء المخزن
+        /// </summary>
+        private void ProcessResponse(long logId, string responseType, string? responseText)
+        {
+            var connStr = GetConnectionString();
+            if (string.IsNullOrEmpty(connStr)) return;
+
+            if (_responseExecutor != null)
+            {
+                try
+                {
+                    _responseExecutor.ProcessResponseAsync(logId, responseType, connStr).GetAwaiter().GetResult();
+                    return;
+                }
+                catch { }
+            }
+
+            try
+            {
+                using var conn = new SqlConnection(connStr);
+                conn.Open();
+                var cmd = new SqlCommand("EXEC Approve_ProcessResponse @LogId, @ResponseType", conn);
+                cmd.CommandTimeout = 30;
+                cmd.Parameters.AddWithValue("@LogId", logId);
+                cmd.Parameters.AddWithValue("@ResponseType", responseType);
+                cmd.ExecuteNonQuery();
+            }
+            catch
+            {
+                try
+                {
+                    using var conn = new SqlConnection(connStr);
+                    conn.Open();
+                    var msg = responseType switch
+                    {
+                        "Approved" => "تمت الموافقة من الرابط",
+                        "Rejected" => "تم الرفض من الرابط",
+                        "Postponed" => "تم التأجيل من الرابط",
+                        _ => responseType
+                    };
+                    if (!string.IsNullOrWhiteSpace(responseText))
+                        msg = msg + " | " + responseText.Trim();
+                    var cmd = new SqlCommand("UPDATE WF_Logs SET Status = @s, LastActionLog = @m, LastUpdatedDate = GETDATE() WHERE Id = @id", conn);
+                    cmd.Parameters.AddWithValue("@s", responseType);
+                    cmd.Parameters.AddWithValue("@m", msg);
+                    cmd.Parameters.AddWithValue("@id", logId);
+                    cmd.ExecuteNonQuery();
+                }
+                catch { }
+            }
+        }
+
+        public class ApproveRequestDto
+        {
+            public string CardName { get; set; } = "";
+            public string CardNumber { get; set; } = "";
+            public string SenderName { get; set; } = "";
+            public string CompanyName { get; set; } = "";
+            public string CompanyPhone { get; set; } = "";
+            public string Notes { get; set; } = "";
+            public string BondDate { get; set; } = "";
+            public string BranchName { get; set; } = "";
+            public string CostCenterName { get; set; } = "";
+            public string ProjectName { get; set; } = "";
+            public string CurrencyName { get; set; } = "";
+            public string AccountName { get; set; } = "";
+            public string TotalAmount { get; set; } = "";
+            /// <summary>كتلة طباعة السند (سند قبض) للعرض والطباعة</summary>
+            public string BondPrintHtml { get; set; } = "";
+        }
+    }
+}
