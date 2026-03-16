@@ -53,9 +53,10 @@ namespace Wafek_Web_Manager.Services
                     if (settings.TryGetProperty("ApproveBaseUrl", out var url)) _approveBaseUrl = url.GetString() ?? "";
                     if (settings.TryGetProperty("ApproveUrlOverride", out var ov)) _approveUrlOverride = ov.GetString() ?? "";
                 }
-                // تعديل من المتغير البيئي فقط (لرابط Render الثابت)
                 var envUrl = Environment.GetEnvironmentVariable("APPROVE_BASE_URL");
                 if (!string.IsNullOrWhiteSpace(envUrl)) _approveBaseUrl = envUrl.Trim();
+                if (string.IsNullOrEmpty(_approveBaseUrl))
+                    _approveBaseUrl = (Environment.GetEnvironmentVariable("RENDER_EXTERNAL_URL") ?? "").Trim();
                 var envOverride = Environment.GetEnvironmentVariable("APPROVE_URL_OVERRIDE");
                 if (!string.IsNullOrWhiteSpace(envOverride)) _approveUrlOverride = envOverride;
             }

@@ -306,12 +306,49 @@ WHERE d.MainGuide = @id", conn);
             }
             catch { }
 
-            // استعلام مجمع حسب الحساب — كما في شكل الإرسال المطلوب
+            // 1) TBL011/TBL012 — سند قبض/صرف غالباً يستخدم هذا الهيكل (BondGuide = TBL010.CardGuide)
             try
             {
                 var detCmd = new SqlCommand(@"
-SELECT
-    TBL004.AccountName AS [الحساب],
+SELECT TBL004.AccountName AS [الحساب],
+    SUM(ISNULL(d.Debit,0)+ISNULL(d.DebitRate,0)) AS [مدين],
+    SUM(ISNULL(d.Credit,0)+ISNULL(d.CreditRate,0)) AS [دائن],
+    MAX(ISNULL(d.Description,d.Notes)) AS [البيان]
+FROM TBL011 h
+INNER JOIN TBL012 d ON h.CardGuide = d.MainGuide
+LEFT JOIN TBL004 ON d.AccountGuide = TBL004.CardGuide
+WHERE h.BondGuide = @id AND (h.Posted = 1 OR h.Posted IS NULL)
+GROUP BY TBL004.AccountName", conn);
+                detCmd.Parameters.AddWithValue("@id", sourceId);
+                using var rd = detCmd.ExecuteReader();
+                decimal sum = 0;
+                while (rd.Read())
+                {
+                    var debit = rd.FieldCount > 1 ? GetDecimalByOrdinal(rd, 1) : 0;
+                    var credit = rd.FieldCount > 2 ? GetDecimalByOrdinal(rd, 2) : 0;
+                    sum += debit + credit;
+                    data.BondDetails.Add(new BondDetailRow
+                    {
+                        AccountCode = "",
+                        AccountName = rd.FieldCount > 0 ? (rd.GetValue(0)?.ToString() ?? "") : "",
+                        Debit = debit,
+                        Credit = credit,
+                        Notes = rd.FieldCount > 3 ? (rd.GetValue(3)?.ToString() ?? "") : "",
+                        CostCenterName = ""
+                    });
+                }
+                if (data.BondDetails.Count > 0 && string.IsNullOrEmpty(data.TotalAmount) && sum != 0)
+                    data.TotalAmount = sum.ToString("N2");
+            }
+            catch { }
+
+            // 2) TBL038 — استعلام مجمع حسب الحساب
+            if (data.BondDetails.Count == 0)
+            {
+            try
+            {
+                var detCmd = new SqlCommand(@"
+SELECT TBL004.AccountName AS [الحساب],
     SUM(ISNULL(d.DebitRate,0)) AS [مدين],
     SUM(ISNULL(d.CreditRate,0)) AS [دائن],
     MAX(ISNULL(d.TruncatedNotes,d.Notes)) AS [البيان]
@@ -341,8 +378,9 @@ GROUP BY TBL004.AccountName", conn);
                     data.TotalAmount = sum.ToString("N2");
             }
             catch { }
+            }
 
-            // احتياطي: تفاصيل سطر بسطر (بدون تجميع)
+            // 3) احتياطي: تفاصيل سطر بسطر (بدون تجميع)
             if (data.BondDetails.Count == 0)
             {
                 try
@@ -686,7 +724,7 @@ WHERE h.BondGuide = @id", conn);
 <table role=""presentation"" cellpadding=""0"" cellspacing=""0"" width=""100%"" style=""background:#e8e8e8;padding:20px 0""><tr><td align=""center"">
 <table role=""presentation"" cellpadding=""0"" cellspacing=""0"" width=""600"" style=""max-width:100%;background:#f1f1f1;border-radius:20px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.08);border:8px solid {ThemeColor};margin:10px;text-align:center;max-width:500px;margin-left:auto;margin-right:auto"">
 <tr><td style=""padding:0"">
-{(string.IsNullOrEmpty(logoUrl) ? "" : $@"<img src=""{logoUrl}"" width=""300"" style=""max-width:300px;margin:15px 10px"" alt=""Logo""/>")}
+{(string.IsNullOrEmpty(logoUrl) ? "" : $@"<img src=""{logoUrl}"" width=""280"" height=""80"" style=""max-width:280px;height:auto;margin:15px auto;display:block"" alt="""" />")}
 </td></tr>
 <tr><td style=""padding:20px"">
 <h1 style=""font-weight:bold;margin:5px;font-size:25px;background:#f1f1f1"">طلب موافقة | <span style=""color:{ThemeColor}"">نظام وافق</span></h1>
@@ -750,7 +788,7 @@ WHERE h.BondGuide = @id", conn);
 <table role=""presentation"" cellpadding=""0"" cellspacing=""0"" width=""100%"" style=""background:#e8e8e8;padding:20px 0""><tr><td align=""center"">
 <table role=""presentation"" cellpadding=""0"" cellspacing=""0"" width=""600"" style=""max-width:100%;background:#f1f1f1;border-radius:20px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.08);border:8px solid {ThemeColor};margin:10px;text-align:center;max-width:500px;margin-left:auto;margin-right:auto"">
 <tr><td style=""padding:0"">
-{(string.IsNullOrEmpty(logoUrl) ? "" : $@"<img src=""{logoUrl}"" width=""300"" style=""max-width:300px;margin:15px 10px"" alt=""Logo""/>")}
+{(string.IsNullOrEmpty(logoUrl) ? "" : $@"<img src=""{logoUrl}"" width=""280"" height=""80"" style=""max-width:280px;height:auto;margin:15px auto;display:block"" alt="""" />")}
 </td></tr>
 <tr><td style=""padding:20px"">
 <h1 style=""font-weight:bold;margin:5px;font-size:25px;background:#f1f1f1"">Request for Approval | <span style=""color:{ThemeColor}"">Wafek System</span></h1>
