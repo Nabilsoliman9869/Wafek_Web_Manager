@@ -8,17 +8,7 @@ var builder = WebApplication.CreateBuilder(args);
 
 static string GetWafekConnectionString(IConfiguration config)
 {
-    // أولوية للمتغيرات البيئية (للرفع على Render وغيره)
-    var envServer = Environment.GetEnvironmentVariable("DB_SERVER");
-    var envDb = Environment.GetEnvironmentVariable("DB_NAME");
-    var envUser = Environment.GetEnvironmentVariable("DB_USER");
-    var envPass = Environment.GetEnvironmentVariable("DB_PASSWORD");
-    if (!string.IsNullOrWhiteSpace(envServer) && !string.IsNullOrWhiteSpace(envUser))
-        return $"Server={envServer};Database={envDb ?? ""};User Id={envUser};Password={envPass ?? ""};TrustServerCertificate=True;Encrypt=True;Connect Timeout=30;";
-
-    var customPath = Path.Combine(AppContext.BaseDirectory, "appsettings.custom.json");
-    if (!File.Exists(customPath))
-        customPath = Path.Combine(Directory.GetCurrentDirectory(), "appsettings.custom.json");
+    var customPath = ConfigHelper.GetConfigFilePath();
     if (File.Exists(customPath))
     {
         try

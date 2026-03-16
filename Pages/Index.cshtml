@@ -1,10 +1,39 @@
-﻿@page
+@page
 @model IndexModel
 @{
-    ViewData["Title"] = "Home page";
+    ViewData["Title"] = "الرئيسية";
 }
 
-<div class="text-center">
-    <h1 class="display-4">Welcome</h1>
-    <p>Learn about <a href="https://learn.microsoft.com/aspnet/core">building Web apps with ASP.NET Core</a>.</p>
+<div class="text-center py-5">
+    <h1 class="display-5 fw-bold mb-3" style="color:#1e7d4a">نظام وافق | TelleWork Workflow</h1>
+    <p class="lead text-muted mb-4">إدارة سير العمل والموافقات عبر الميل</p>
+    <div class="row g-3 justify-content-center mt-4">
+        <div class="col-md-4">
+            <div class="card h-100 border-0 shadow-sm">
+                <div class="card-body">
+                    <h5 class="card-title" style="color:#32b380">مصمم الورك فلو</h5>
+                    <p class="card-text text-muted small">إنشاء وتعديل مسارات الموافقة</p>
+                    <a asp-page="/WorkflowMaster" class="btn btn-primary btn-sm">افتح</a>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card h-100 border-0 shadow-sm">
+                <div class="card-body">
+                    <h5 class="card-title" style="color:#32b380">مراجعة الورك فلو</h5>
+                    <p class="card-text text-muted small">عرض ومتابعة العمليات</p>
+                    <a asp-page="/WorkflowReview" asp-route-id="1" class="btn btn-primary btn-sm">افتح</a>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card h-100 border-0 shadow-sm">
+                <div class="card-body">
+                    <h5 class="card-title" style="color:#32b380">الإعدادات</h5>
+                    <p class="card-text text-muted small">قاعدة البيانات، الميل، IMAP</p>
+                    <a asp-page="/Setup" class="btn btn-primary btn-sm">افتح</a>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>

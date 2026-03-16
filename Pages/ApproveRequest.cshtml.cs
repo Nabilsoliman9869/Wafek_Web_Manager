@@ -18,9 +18,10 @@ namespace Wafek_Web_Manager.Pages
         {
             try
             {
-                if (System.IO.File.Exists("appsettings.custom.json"))
+                var configPath = ConfigHelper.GetConfigFilePath();
+                if (System.IO.File.Exists(configPath))
                 {
-                    var json = System.IO.File.ReadAllText("appsettings.custom.json");
+                    var json = System.IO.File.ReadAllText(configPath);
                     var s = System.Text.Json.JsonSerializer.Deserialize<System.Text.Json.JsonElement>(json);
                     var server = s.GetProperty("DbServer").GetString();
                     var db = s.GetProperty("DbName").GetString();
@@ -39,7 +40,7 @@ namespace Wafek_Web_Manager.Pages
         public string Message { get; set; } = "";
         public bool IsSuccess { get; set; }
 
-        public IActionResult OnGet(long? id)
+        public IActionResult OnGet(long? id, string? action)
         {
             if (id == null || id == 0)
             {
@@ -48,6 +49,24 @@ namespace Wafek_Web_Manager.Pages
                 return Page();
             }
             LogId = id.Value;
+            if (!string.IsNullOrWhiteSpace(action))
+            {
+                var responseType = action.Trim() switch
+                {
+                    "Approved" or "موافق" or "1" => "Approved",
+                    "Rejected" or "رفض" or "2" => "Rejected",
+                    "Postponed" or "يؤجل" or "3" => "Postponed",
+                    _ => null
+                };
+                if (responseType != null)
+                {
+                    ProcessResponse(LogId, responseType, null);
+                    LoadRequest();
+                    Message = responseType == "Approved" ? "تمت الموافقة بنجاح." : responseType == "Rejected" ? "تم الرفض." : "تم التأجيل.";
+                    IsSuccess = responseType != "Rejected";
+                    return Page();
+                }
+            }
             LoadRequest();
             return Page();
         }

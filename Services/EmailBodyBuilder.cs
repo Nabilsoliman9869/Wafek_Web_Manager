@@ -25,26 +25,39 @@ namespace Wafek_Web_Manager.Services
 
         /// <summary>
         /// الحصول على اللوجو كـ base64 — يدعم jpg/png — واضح في Gmail
+        /// عند فشل القراءة يُستخدم رابط CDN احتياطي
         /// </summary>
         public static string GetLogoAsBase64DataUrl()
         {
-            var dir = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "images");
-            if (!Directory.Exists(dir))
-                dir = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "wwwroot", "images"));
-            if (!Directory.Exists(dir)) return "";
-            var path = Path.Combine(dir, "TELLEWORK.jpg");
-            if (!File.Exists(path)) path = Path.Combine(dir, "TELLEWORK.png");
-            if (!File.Exists(path)) path = Path.Combine(dir, "logo.png");
-            if (!File.Exists(path)) return "";
-            try
+            var dirs = new[]
             {
-                var bytes = File.ReadAllBytes(path);
-                var ext = Path.GetExtension(path).ToLowerInvariant();
-                var mime = ext == ".png" ? "image/png" : "image/jpeg";
-                return $"data:{mime};base64," + Convert.ToBase64String(bytes);
+                Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "images"),
+                Path.Combine(AppContext.BaseDirectory, "wwwroot", "images"),
+                Path.Combine(Directory.GetCurrentDirectory(), "images"),
+                Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "wwwroot", "images")),
+            };
+            foreach (var dir in dirs)
+            {
+                if (string.IsNullOrEmpty(dir) || !Directory.Exists(dir)) continue;
+                foreach (var name in new[] { "TELLEWORK.jpg", "TELLEWORK.png", "logo.jpg", "logo.png" })
+                {
+                    var path = Path.Combine(dir, name);
+                    if (!File.Exists(path)) continue;
+                    try
+                    {
+                        var bytes = File.ReadAllBytes(path);
+                        var ext = Path.GetExtension(path).ToLowerInvariant();
+                        var mime = ext == ".png" ? "image/png" : "image/jpeg";
+                        return $"data:{mime};base64," + Convert.ToBase64String(bytes);
+                    }
+                    catch { }
+                }
             }
-            catch { return ""; }
+            return "";
         }
+
+        /// <summary>رابط احتياطي للوجو عند فشل base64 (مثلاً على Render)</summary>
+        public static string GetLogoFallbackUrl() => "https://i.ibb.co/NynTy6Q/xtra-wafek-logo.png";
 
         public EmailBodyBuilder(string connectionString)
         {
@@ -293,31 +306,34 @@ WHERE d.MainGuide = @id", conn);
             }
             catch { }
 
+            // استعلام مجمع حسب الحساب — كما في شكل الإرسال المطلوب
             try
             {
                 var detCmd = new SqlCommand(@"
-SELECT acc.AccountName,
-    ISNULL(d.DebitRate,0) AS DebitRate,
-    ISNULL(d.CreditRate,0) AS CreditRate,
-    ISNULL(d.TruncatedNotes,d.Notes) AS Notes
+SELECT
+    TBL004.AccountName AS [الحساب],
+    SUM(ISNULL(d.DebitRate,0)) AS [مدين],
+    SUM(ISNULL(d.CreditRate,0)) AS [دائن],
+    MAX(ISNULL(d.TruncatedNotes,d.Notes)) AS [البيان]
 FROM TBL038 d
-LEFT JOIN TBL004 acc ON acc.CardGuide = d.AccountGuide
-WHERE d.MainGuide = @id", conn);
-                detCmd.Parameters.AddWithValue("@id", sourceId);
+LEFT JOIN TBL004 ON d.AccountGuide = TBL004.CardGuide
+WHERE d.MainGuide = @CardGuide
+GROUP BY TBL004.AccountName", conn);
+                detCmd.Parameters.AddWithValue("@CardGuide", sourceId);
                 using var rd = detCmd.ExecuteReader();
                 decimal sum = 0;
                 while (rd.Read())
                 {
-                    var debit = GetDecimal(rd, "DebitRate");
-                    var credit = GetDecimal(rd, "CreditRate");
+                    var debit = rd.FieldCount > 1 ? GetDecimalByOrdinal(rd, 1) : 0;
+                    var credit = rd.FieldCount > 2 ? GetDecimalByOrdinal(rd, 2) : 0;
                     sum += debit + credit;
                     data.BondDetails.Add(new BondDetailRow
                     {
                         AccountCode = "",
-                        AccountName = GetColVal(rd, "AccountName") ?? "",
+                        AccountName = rd.FieldCount > 0 ? (rd.GetValue(0)?.ToString() ?? "") : "",
                         Debit = debit,
                         Credit = credit,
-                        Notes = GetColVal(rd, "Notes") ?? "",
+                        Notes = rd.FieldCount > 3 ? (rd.GetValue(3)?.ToString() ?? "") : "",
                         CostCenterName = ""
                     });
                 }
@@ -325,6 +341,81 @@ WHERE d.MainGuide = @id", conn);
                     data.TotalAmount = sum.ToString("N2");
             }
             catch { }
+
+            // احتياطي: تفاصيل سطر بسطر (بدون تجميع)
+            if (data.BondDetails.Count == 0)
+            {
+                try
+                {
+                    var detCmd = new SqlCommand(@"
+SELECT acc.AccountName,
+    ISNULL(d.DebitRate,0) AS DebitRate,
+    ISNULL(d.CreditRate,0) AS CreditRate,
+    ISNULL(d.TruncatedNotes,d.Notes) AS Notes
+FROM TBL038 d
+LEFT JOIN TBL004 acc ON acc.CardGuide = d.AccountGuide
+WHERE d.MainGuide = @id", conn);
+                    detCmd.Parameters.AddWithValue("@id", sourceId);
+                    using var rd = detCmd.ExecuteReader();
+                    decimal sum = 0;
+                    while (rd.Read())
+                    {
+                        var debit = GetDecimal(rd, "DebitRate");
+                        var credit = GetDecimal(rd, "CreditRate");
+                        sum += debit + credit;
+                        data.BondDetails.Add(new BondDetailRow
+                        {
+                            AccountCode = "",
+                            AccountName = GetColVal(rd, "AccountName") ?? "",
+                            Debit = debit,
+                            Credit = credit,
+                            Notes = GetColVal(rd, "Notes") ?? "",
+                            CostCenterName = ""
+                        });
+                    }
+                    if (data.BondDetails.Count > 0 && string.IsNullOrEmpty(data.TotalAmount) && sum != 0)
+                        data.TotalAmount = sum.ToString("N2");
+                }
+                catch { }
+            }
+
+            // احتياطي: TBL011/TBL012 — عندما تستخدم المنظومة هذا الهيكل بدل TBL038
+            if (data.BondDetails.Count == 0)
+            {
+                try
+                {
+                    var altCmd = new SqlCommand(@"
+SELECT acc.AccountName,
+    ISNULL(d.Debit,0)+ISNULL(d.DebitRate,0) AS DebitRate,
+    ISNULL(d.Credit,0)+ISNULL(d.CreditRate,0) AS CreditRate,
+    ISNULL(d.Description,d.Notes) AS Notes
+FROM TBL011 h
+INNER JOIN TBL012 d ON h.CardGuide = d.MainGuide
+LEFT JOIN TBL004 acc ON acc.CardGuide = d.AccountGuide
+WHERE h.BondGuide = @id", conn);
+                    altCmd.Parameters.AddWithValue("@id", sourceId);
+                    using var altRd = altCmd.ExecuteReader();
+                    decimal sum = 0;
+                    while (altRd.Read())
+                    {
+                        var debit = GetDecimal(altRd, "DebitRate");
+                        var credit = GetDecimal(altRd, "CreditRate");
+                        sum += debit + credit;
+                        data.BondDetails.Add(new BondDetailRow
+                        {
+                            AccountCode = "",
+                            AccountName = GetColVal(altRd, "AccountName") ?? "",
+                            Debit = debit,
+                            Credit = credit,
+                            Notes = GetColVal(altRd, "Notes") ?? "",
+                            CostCenterName = ""
+                        });
+                    }
+                    if (data.BondDetails.Count > 0 && string.IsNullOrEmpty(data.TotalAmount) && sum != 0)
+                        data.TotalAmount = sum.ToString("N2");
+                }
+                catch { }
+            }
         }
 
         static decimal GetDecimal(Microsoft.Data.SqlClient.SqlDataReader r, string col)
@@ -332,6 +423,17 @@ WHERE d.MainGuide = @id", conn);
             try
             {
                 var i = r.GetOrdinal(col);
+                if (r.IsDBNull(i)) return 0;
+                var v = r.GetValue(i);
+                return Convert.ToDecimal(v);
+            }
+            catch { return 0; }
+        }
+
+        static decimal GetDecimalByOrdinal(Microsoft.Data.SqlClient.SqlDataReader r, int i)
+        {
+            try
+            {
                 if (r.IsDBNull(i)) return 0;
                 var v = r.GetValue(i);
                 return Convert.ToDecimal(v);
@@ -566,27 +668,25 @@ WHERE d.MainGuide = @id", conn);
             var company = d.CompanyName ?? "";
             var phone = d.CompanyPhone ?? "";
             var notes = d.Notes ?? "";
-            var logoImg = GetLogoAsBase64DataUrl();
+            var logoUrl = GetLogoFallbackUrl();
 
             var summaryBlock = $@"<p style=""background:#f1f1f1;text-align:right;margin:10px;direction:rtl"">إلى السيد: <b>{recipientName}</b><br/>نوع البطاقة: <b>{cardName}</b> | رقمها: <b>{cardNum}</b><br/>تاريخ إرسال الطلب: <b>{sendDate}</b><br/>المرسل: <b>{sender}</b><br/>شركة: <b>{company}</b><br/>هاتف: <b>{phone}</b></p><p style=""color:#128ab5;text-align:right;margin:10px;background:#f1f1f1"">ملاحظات: <b>{notes}</b></p>";
             var docBlock = string.IsNullOrWhiteSpace(documentBlock) ? "" : $@"<div style=""margin:16px 0;padding:12px;background:#fff;border:1px solid #ddd;overflow-x:auto"">{documentBlock}</div>";
+            var sep = approveLink?.Contains("?") == true ? "&" : "?";
             var linkBlock = string.IsNullOrEmpty(approveLink)
-                ? $@"<p style=""font-size:13px;font-weight:bold;margin-top:16px;margin-bottom:8px;text-align:center"">للرد: أعد الإرسال على هذا الميل واكتب الرقم أو النص:</p>
-<table role=""presentation"" cellpadding=""0"" cellspacing=""8"" align=""center"" style=""margin:16px auto""><tr>
-<td style=""background:#e8f5e9;padding:12px 18px;border-radius:12px;border:2px solid {ThemeColor};font-size:15px;font-weight:bold"">☐ 1 موافق</td>
-<td style=""background:#ffebee;padding:12px 18px;border-radius:12px;border:2px solid #c62828;font-size:15px;font-weight:bold"">☐ 2 رفض</td>
-<td style=""background:#fff3e0;padding:12px 18px;border-radius:12px;border:2px solid #e65100;font-size:15px;font-weight:bold"">☐ 3 يؤجل</td>
-</tr></table>
-<p style=""font-size:12px;text-align:center;color:#666"">مثال: اكتب 1 أو موافق للموافقة، 2 أو رفض للرفض، 3 أو يؤجل للتأجيل</p>"
-                : $@"<p style=""font-size:14px;font-weight:bold;margin-top:20px;text-align:center"">للرد بأزرار تفاعلية:</p>
-<a href=""{approveLink}"" style=""display:block;text-align:center;margin:16px 10px 20px;text-decoration:none;font-weight:bold;font-size:20px;color:{ThemeColor};border:3px solid {ThemeColor};border-radius:12px;padding:16px 24px;background:#e8f5e9"" target=""_blank"">اضغط هنا لفتح صفحة الرد (أزرار موافق / رفض / يؤجل)</a>
-<p style=""font-size:12px;text-align:center;color:#666"">أو أعد الإرسال على هذا الميل واكتب 1 موافق، 2 رفض، 3 يؤجل</p>";
+                ? $@"<p style=""font-size:13px;font-weight:bold;margin-top:16px;margin-bottom:8px;text-align:center"">للرد: أعد الإرسال على هذا الميل واكتب 1 أو 2 أو 3</p>"
+                : $@"<p style=""font-size:14px;font-weight:bold;margin-top:20px;text-align:center"">اضغط للرد مباشرة:</p>
+<table role=""presentation"" cellpadding=""0"" cellspacing=""10"" align=""center"" style=""margin:20px auto""><tr>
+<td><a href=""{approveLink}{sep}action=Approved"" style=""display:inline-block;padding:14px 24px;background:#22c55e;color:#fff!important;font-weight:bold;font-size:15px;text-decoration:none;border-radius:10px"" target=""_blank"">✓ موافق</a></td>
+<td><a href=""{approveLink}{sep}action=Rejected"" style=""display:inline-block;padding:14px 24px;background:#ef4444;color:#fff!important;font-weight:bold;font-size:15px;text-decoration:none;border-radius:10px"" target=""_blank"">✗ رفض</a></td>
+<td><a href=""{approveLink}{sep}action=Postponed"" style=""display:inline-block;padding:14px 24px;background:#f59e0b;color:#fff!important;font-weight:bold;font-size:15px;text-decoration:none;border-radius:10px"" target=""_blank"">⏳ يؤجل</a></td>
+</tr></table>";
 
             return $@"<!DOCTYPE html><html lang=""ar"" dir=""rtl""><head><meta charset=""UTF-8""/><meta name=""viewport"" content=""width=device-width,initial-scale=1""/><title>نظام وافق | طلب موافقة</title></head><body style=""margin:0;padding:0;background:#e8e8e8;font-family:Arial,sans-serif"">
 <table role=""presentation"" cellpadding=""0"" cellspacing=""0"" width=""100%"" style=""background:#e8e8e8;padding:20px 0""><tr><td align=""center"">
 <table role=""presentation"" cellpadding=""0"" cellspacing=""0"" width=""600"" style=""max-width:100%;background:#f1f1f1;border-radius:20px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.08);border:8px solid {ThemeColor};margin:10px;text-align:center;max-width:500px;margin-left:auto;margin-right:auto"">
 <tr><td style=""padding:0"">
-{(string.IsNullOrEmpty(logoImg) ? "" : $@"<img src=""{logoImg}"" width=""300"" style=""max-width:300px;margin:15px 10px"" alt=""Logo""/>")}
+{(string.IsNullOrEmpty(logoUrl) ? "" : $@"<img src=""{logoUrl}"" width=""300"" style=""max-width:300px;margin:15px 10px"" alt=""Logo""/>")}
 </td></tr>
 <tr><td style=""padding:20px"">
 <h1 style=""font-weight:bold;margin:5px;font-size:25px;background:#f1f1f1"">طلب موافقة | <span style=""color:{ThemeColor}"">نظام وافق</span></h1>
@@ -632,27 +732,25 @@ WHERE d.MainGuide = @id", conn);
             var company = d.CompanyName ?? "";
             var phone = d.CompanyPhone ?? "";
             var notes = d.Notes ?? "";
-            var logoImg = GetLogoAsBase64DataUrl();
+            var logoUrl = GetLogoFallbackUrl();
 
             var summaryBlock = $@"<p style=""background:#f1f1f1;text-align:left;margin:10px"">To Mr: <b>{recipientName}</b><br/>Card Type: <b>{cardName}</b> | Card Number: <b>{cardNum}</b><br/>Request Send Date: <b>{sendDate}</b><br/>Sender: <b>{sender}</b><br/>Company: <b>{company}</b><br/>Phone: <b>{phone}</b></p><p style=""color:#128ab5;text-align:left;margin:10px;background:#f1f1f1"">Notes: <b>{notes}</b></p>";
             var docBlock = string.IsNullOrWhiteSpace(documentBlock) ? "" : $@"<div style=""margin:16px 0;padding:12px;background:#fff;border:1px solid #ddd;overflow-x:auto"">{documentBlock}</div>";
+            var linkSep = approveLink?.Contains("?") == true ? "&" : "?";
             var linkBlock = string.IsNullOrEmpty(approveLink)
-                ? $@"<p style=""font-size:13px;font-weight:bold;margin-top:16px;margin-bottom:8px;text-align:center"">To reply: Reply to this email and type the number or text:</p>
-<table role=""presentation"" cellpadding=""0"" cellspacing=""8"" align=""center"" style=""margin:16px auto""><tr>
-<td style=""background:#e8f5e9;padding:12px 18px;border-radius:12px;border:2px solid {ThemeColor};font-size:15px;font-weight:bold"">☐ 1 Approved</td>
-<td style=""background:#ffebee;padding:12px 18px;border-radius:12px;border:2px solid #c62828;font-size:15px;font-weight:bold"">☐ 2 Rejected</td>
-<td style=""background:#fff3e0;padding:12px 18px;border-radius:12px;border:2px solid #e65100;font-size:15px;font-weight:bold"">☐ 3 Postponed</td>
-</tr></table>
-<p style=""font-size:12px;text-align:center;color:#666"">Example: type 1 or Approved to approve, 2 or Rejected to reject, 3 or Postponed to postpone</p>"
-                : $@"<p style=""font-size:14px;font-weight:bold;margin-top:20px;text-align:center"">To reply with interactive buttons:</p>
-<a href=""{approveLink}"" style=""display:block;text-align:center;margin:16px 10px 20px;text-decoration:none;font-weight:bold;font-size:20px;color:{ThemeColor};border:3px solid {ThemeColor};border-radius:12px;padding:16px 24px;background:#e8f5e9"" target=""_blank"">Click here to open reply page (Approve / Reject / Postpone buttons)</a>
-<p style=""font-size:12px;text-align:center;color:#666"">Or reply to this email and type 1 approved, 2 rejected, 3 postponed</p>";
+                ? $@"<p style=""font-size:13px;font-weight:bold;margin-top:16px;margin-bottom:8px;text-align:center"">To reply: Reply to this email and type 1, 2, or 3</p>"
+                : $@"<p style=""font-size:14px;font-weight:bold;margin-top:20px;text-align:center"">Click to reply:</p>
+<table role=""presentation"" cellpadding=""0"" cellspacing=""10"" align=""center"" style=""margin:20px auto""><tr>
+<td><a href=""{approveLink}{linkSep}action=Approved"" style=""display:inline-block;padding:14px 24px;background:#22c55e;color:#fff!important;font-weight:bold;font-size:15px;text-decoration:none;border-radius:10px"" target=""_blank"">✓ Approved</a></td>
+<td><a href=""{approveLink}{linkSep}action=Rejected"" style=""display:inline-block;padding:14px 24px;background:#ef4444;color:#fff!important;font-weight:bold;font-size:15px;text-decoration:none;border-radius:10px"" target=""_blank"">✗ Rejected</a></td>
+<td><a href=""{approveLink}{linkSep}action=Postponed"" style=""display:inline-block;padding:14px 24px;background:#f59e0b;color:#fff!important;font-weight:bold;font-size:15px;text-decoration:none;border-radius:10px"" target=""_blank"">⏳ Postponed</a></td>
+</tr></table>";
 
             return $@"<!DOCTYPE html><html lang=""en"" dir=""ltr""><head><meta charset=""UTF-8""/><meta name=""viewport"" content=""width=device-width,initial-scale=1""/><title>Wafek System | Approval Request</title></head><body style=""margin:0;padding:0;background:#e8e8e8;font-family:Arial,sans-serif"">
 <table role=""presentation"" cellpadding=""0"" cellspacing=""0"" width=""100%"" style=""background:#e8e8e8;padding:20px 0""><tr><td align=""center"">
 <table role=""presentation"" cellpadding=""0"" cellspacing=""0"" width=""600"" style=""max-width:100%;background:#f1f1f1;border-radius:20px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.08);border:8px solid {ThemeColor};margin:10px;text-align:center;max-width:500px;margin-left:auto;margin-right:auto"">
 <tr><td style=""padding:0"">
-{(string.IsNullOrEmpty(logoImg) ? "" : $@"<img src=""{logoImg}"" width=""300"" style=""max-width:300px;margin:15px 10px"" alt=""Logo""/>")}
+{(string.IsNullOrEmpty(logoUrl) ? "" : $@"<img src=""{logoUrl}"" width=""300"" style=""max-width:300px;margin:15px 10px"" alt=""Logo""/>")}
 </td></tr>
 <tr><td style=""padding:20px"">
 <h1 style=""font-weight:bold;margin:5px;font-size:25px;background:#f1f1f1"">Request for Approval | <span style=""color:{ThemeColor}"">Wafek System</span></h1>

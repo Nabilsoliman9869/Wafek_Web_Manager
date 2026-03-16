@@ -22,9 +22,10 @@ namespace Wafek_Web_Manager.Pages
         {
             try
             {
-                if (System.IO.File.Exists("appsettings.custom.json"))
+                var configPath = ConfigHelper.GetConfigFilePath();
+                if (System.IO.File.Exists(configPath))
                 {
-                    var json = System.IO.File.ReadAllText("appsettings.custom.json");
+                    var json = System.IO.File.ReadAllText(configPath);
                     var s = System.Text.Json.JsonSerializer.Deserialize<System.Text.Json.JsonElement>(json);
                     return $"Server={s.GetProperty("DbServer").GetString()};Database={s.GetProperty("DbName").GetString()};User Id={s.GetProperty("DbUser").GetString()};Password={s.GetProperty("DbPassword").GetString()};TrustServerCertificate=True;Encrypt=True;";
                 }

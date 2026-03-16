@@ -34,23 +34,10 @@ namespace Wafek_Web_Manager.Services
         {
             try
             {
-                // أولوية للمتغيرات البيئية (للرفع على Render)
-                var envDb = Environment.GetEnvironmentVariable("DB_SERVER");
-                if (!string.IsNullOrWhiteSpace(envDb))
+                var configPath = ConfigHelper.GetConfigFilePath();
+                if (System.IO.File.Exists(configPath))
                 {
-                    _connectionString = $"Server={envDb};Database={Environment.GetEnvironmentVariable("DB_NAME") ?? ""};User Id={Environment.GetEnvironmentVariable("DB_USER") ?? ""};Password={Environment.GetEnvironmentVariable("DB_PASSWORD") ?? ""};TrustServerCertificate=True;Encrypt=True;Connect Timeout=30;";
-                    _smtpServer = Environment.GetEnvironmentVariable("SMTP_SERVER") ?? "";
-                    if (int.TryParse(Environment.GetEnvironmentVariable("SMTP_PORT"), out var sp)) _smtpPort = sp;
-                    _senderEmail = Environment.GetEnvironmentVariable("SENDER_EMAIL") ?? "";
-                    _senderPassword = (Environment.GetEnvironmentVariable("SENDER_PASSWORD") ?? "").Replace(" ", "").Trim();
-                    _approveBaseUrl = (Environment.GetEnvironmentVariable("APPROVE_BASE_URL") ?? "").Trim();
-                    _approveUrlOverride = Environment.GetEnvironmentVariable("APPROVE_URL_OVERRIDE") ?? "";
-                    return;
-                }
-
-                if (System.IO.File.Exists("appsettings.custom.json"))
-                {
-                    var json = System.IO.File.ReadAllText("appsettings.custom.json");
+                    var json = System.IO.File.ReadAllText(configPath);
                     var settings = JsonSerializer.Deserialize<JsonElement>(json);
 
                     var server = settings.GetProperty("DbServer").GetString();
@@ -66,6 +53,7 @@ namespace Wafek_Web_Manager.Services
                     if (settings.TryGetProperty("ApproveBaseUrl", out var url)) _approveBaseUrl = url.GetString() ?? "";
                     if (settings.TryGetProperty("ApproveUrlOverride", out var ov)) _approveUrlOverride = ov.GetString() ?? "";
                 }
+                // تعديل من المتغير البيئي فقط (لرابط Render الثابت)
                 var envUrl = Environment.GetEnvironmentVariable("APPROVE_BASE_URL");
                 if (!string.IsNullOrWhiteSpace(envUrl)) _approveBaseUrl = envUrl.Trim();
                 var envOverride = Environment.GetEnvironmentVariable("APPROVE_URL_OVERRIDE");

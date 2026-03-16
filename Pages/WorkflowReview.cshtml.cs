@@ -10,9 +10,10 @@ namespace Wafek_Web_Manager.Pages
         {
             try
             {
-                if (System.IO.File.Exists("appsettings.custom.json"))
+                var configPath = ConfigHelper.GetConfigFilePath();
+                if (System.IO.File.Exists(configPath))
                 {
-                    var json = System.IO.File.ReadAllText("appsettings.custom.json");
+                    var json = System.IO.File.ReadAllText(configPath);
                     var settings = System.Text.Json.JsonSerializer.Deserialize<System.Text.Json.JsonElement>(json);
                     string server = settings.GetProperty("DbServer").GetString() ?? "";
                     string db = settings.GetProperty("DbName").GetString() ?? "";

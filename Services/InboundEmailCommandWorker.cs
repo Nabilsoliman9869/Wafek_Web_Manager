@@ -32,8 +32,9 @@ namespace Wafek_Web_Manager.Services
         {
             try
             {
-                if (!System.IO.File.Exists("appsettings.custom.json")) return;
-                var json = System.IO.File.ReadAllText("appsettings.custom.json");
+                var configPath = ConfigHelper.GetConfigFilePath();
+                if (!System.IO.File.Exists(configPath)) return;
+                var json = System.IO.File.ReadAllText(configPath);
                 var s = JsonSerializer.Deserialize<JsonElement>(json);
                 var server = s.GetProperty("DbServer").GetString();
                 var db = s.GetProperty("DbName").GetString();

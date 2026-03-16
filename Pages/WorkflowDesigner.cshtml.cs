@@ -15,8 +15,7 @@ namespace Wafek_Web_Manager.Pages
         {
             try
             {
-                var path = System.IO.Path.Combine(System.AppContext.BaseDirectory, "appsettings.custom.json");
-                if (!System.IO.File.Exists(path)) path = System.IO.Path.Combine(System.IO.Directory.GetCurrentDirectory(), "appsettings.custom.json");
+                var path = ConfigHelper.GetConfigFilePath();
                 if (System.IO.File.Exists(path))
                 {
                     var json = System.IO.File.ReadAllText(path);

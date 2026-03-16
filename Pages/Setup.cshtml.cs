@@ -54,11 +54,12 @@ namespace Wafek_Web_Manager.Pages
 
         public void OnGet()
         {
-            if (System.IO.File.Exists("appsettings.custom.json"))
+            var configPath = ConfigHelper.GetConfigFilePath();
+            if (System.IO.File.Exists(configPath))
             {
                 try
                 {
-                    var json = System.IO.File.ReadAllText("appsettings.custom.json");
+                    var json = System.IO.File.ReadAllText(configPath);
                     var settings = System.Text.Json.JsonSerializer.Deserialize<dynamic>(json);
 
                     // استرجاع القيم لملء النموذج
@@ -77,9 +78,13 @@ namespace Wafek_Web_Manager.Pages
                     if (settings.TryGetProperty("ImapEnabled", out System.Text.Json.JsonElement ie)) ImapEnabled = ie.GetBoolean();
                     if (settings.TryGetProperty("ImapServer", out System.Text.Json.JsonElement im)) ImapServer = im.GetString() ?? "imap.gmail.com";
                     if (settings.TryGetProperty("ImapPort", out System.Text.Json.JsonElement ip)) ImapPort = ip.GetInt32();
+                    if (string.IsNullOrEmpty(ApproveBaseUrl) && HttpContext?.Request != null)
+                        ApproveBaseUrl = $"{HttpContext.Request.Scheme}://{HttpContext.Request.Host}";
                 }
                 catch { }
             }
+            else if (string.IsNullOrEmpty(ApproveBaseUrl) && HttpContext?.Request != null)
+                ApproveBaseUrl = $"{HttpContext.Request.Scheme}://{HttpContext.Request.Host}";
         }
 
         public void OnPostTestConnection()
@@ -144,11 +149,12 @@ namespace Wafek_Web_Manager.Pages
         {
             // الاحتفاظ بكلمة مرور البريد إن لم تُدخل جديدة (حقل كلمة المرور غالباً فارغ عند الحفظ)
             var passwordToSave = SenderPassword;
-            if (string.IsNullOrWhiteSpace(passwordToSave) && System.IO.File.Exists("appsettings.custom.json"))
+            var configPath = ConfigHelper.GetConfigFilePath();
+            if (string.IsNullOrWhiteSpace(passwordToSave) && System.IO.File.Exists(configPath))
             {
                 try
                 {
-                    var json = System.IO.File.ReadAllText("appsettings.custom.json");
+                    var json = System.IO.File.ReadAllText(configPath);
                     var s = System.Text.Json.JsonSerializer.Deserialize<System.Text.Json.JsonElement>(json);
                     if (s.TryGetProperty("SenderPassword", out var sp) && sp.ValueKind != System.Text.Json.JsonValueKind.Null)
                         passwordToSave = sp.GetString() ?? "";
@@ -157,10 +163,10 @@ namespace Wafek_Web_Manager.Pages
             }
 
             var settings = new { DbServer, DbName, DbUser, DbPassword, SmtpServer, SmtpPort, SenderEmail, SenderPassword = passwordToSave ?? "", EnableSsl, ApproveBaseUrl, ApproveUrlOverride, ImapEnabled, ImapServer, ImapPort };
-            var jsonOut = System.Text.Json.JsonSerializer.Serialize(settings);
-            System.IO.File.WriteAllText("appsettings.custom.json", jsonOut);
+            var jsonOut = System.Text.Json.JsonSerializer.Serialize(settings, new System.Text.Json.JsonSerializerOptions { WriteIndented = true });
+            System.IO.File.WriteAllText(configPath, jsonOut);
 
-            Message = "Settings Saved Successfully (Persisted to appsettings.custom.json).";
+            Message = "تم حفظ الإعدادات بنجاح. يمكنك تغيير قاعدة البيانات أو السيرفر من هنا في أي وقت.";
             IsSuccess = true;
         }
 
@@ -270,10 +276,11 @@ namespace Wafek_Web_Manager.Pages
 
         private void LoadImapSettingsFromFile()
         {
-            if (!System.IO.File.Exists("appsettings.custom.json")) return;
+            var configPath = ConfigHelper.GetConfigFilePath();
+            if (!System.IO.File.Exists(configPath)) return;
             try
             {
-                var json = System.IO.File.ReadAllText("appsettings.custom.json");
+                var json = System.IO.File.ReadAllText(configPath);
                 var settings = System.Text.Json.JsonSerializer.Deserialize<System.Text.Json.JsonElement>(json);
                 if (settings.TryGetProperty("ImapServer", out var im)) ImapServer = im.GetString() ?? "imap.gmail.com";
                 if (settings.TryGetProperty("ImapPort", out var ip)) ImapPort = ip.GetInt32();
@@ -286,10 +293,11 @@ namespace Wafek_Web_Manager.Pages
         /// </summary>
         private void LoadEmailSettingsFromFile()
         {
-            if (!System.IO.File.Exists("appsettings.custom.json")) return;
+            var configPath = ConfigHelper.GetConfigFilePath();
+            if (!System.IO.File.Exists(configPath)) return;
             try
             {
-                var json = System.IO.File.ReadAllText("appsettings.custom.json");
+                var json = System.IO.File.ReadAllText(configPath);
                 var settings = System.Text.Json.JsonSerializer.Deserialize<System.Text.Json.JsonElement>(json);
                 if (settings.TryGetProperty("SmtpServer", out var s)) SmtpServer = s.GetString() ?? "";
                 if (settings.TryGetProperty("SmtpPort", out var p)) SmtpPort = p.GetInt32();
