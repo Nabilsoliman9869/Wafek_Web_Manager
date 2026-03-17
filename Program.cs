@@ -20,7 +20,7 @@ static string GetWafekConnectionString(IConfiguration config)
             var db = root.TryGetProperty("DbName", out var d) ? d.GetString() : "";
             var user = root.TryGetProperty("DbUser", out var u) ? u.GetString() : "";
             var pass = root.TryGetProperty("DbPassword", out var p) ? p.GetString() : "";
-            var encrypt = true;
+            var encrypt = false;
             if (root.TryGetProperty("DbEncrypt", out var enc)) encrypt = enc.GetBoolean();
             if (!string.IsNullOrEmpty(server) && !string.IsNullOrEmpty(user))
                 return $"Server={server};Database={db};User Id={user};Password={pass};TrustServerCertificate=True;Encrypt={encrypt};";

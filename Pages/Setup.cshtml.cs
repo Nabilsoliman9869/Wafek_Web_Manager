@@ -23,9 +23,9 @@ namespace Wafek_Web_Manager.Pages
         public string DbUser { get; set; } = "LA7";
         [BindProperty]
         public string DbPassword { get; set; } = string.Empty;
-        /// <summary>استخدام تشفير SSL للاتصال بقاعدة البيانات. عند ظهور خطأ SSL handshake يمكن تعطيله.</summary>
+        /// <summary>استخدام تشفير SSL للاتصال بقاعدة البيانات. الافتراضي false لتجنب خطأ handshake على بعض السيرفرات.</summary>
         [BindProperty]
-        public bool DbEncrypt { get; set; } = true;
+        public bool DbEncrypt { get; set; } = false;
 
         [BindProperty]
         public string SmtpServer { get; set; } = "smtp.gmail.com";

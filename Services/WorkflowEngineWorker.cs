@@ -44,7 +44,7 @@ namespace Wafek_Web_Manager.Services
                     var db = settings.GetProperty("DbName").GetString();
                     var user = settings.GetProperty("DbUser").GetString();
                     var pass = settings.GetProperty("DbPassword").GetString();
-                    var encrypt = settings.TryGetProperty("DbEncrypt", out var enc) ? enc.GetBoolean() : true;
+                    var encrypt = settings.TryGetProperty("DbEncrypt", out var enc) ? enc.GetBoolean() : false;
                     _connectionString = $"Server={server};Database={db};User Id={user};Password={pass};TrustServerCertificate=True;Encrypt={encrypt};Connect Timeout=30;";
 
                     if (settings.TryGetProperty("SmtpServer", out var s)) _smtpServer = s.GetString();
