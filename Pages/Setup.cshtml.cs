@@ -323,7 +323,7 @@ namespace Wafek_Web_Manager.Pages
                 UserID = DbUser,
                 Password = DbPassword,
                 TrustServerCertificate = true,
-                Encrypt = DbEncrypt,
+                Encrypt = false,
                 ConnectTimeout = 30
             };
             return builder.ConnectionString;

@@ -42,10 +42,10 @@
                 <div class="row">
                     <div class="col-12 mb-3">
                         <div class="form-check">
-                            <input class="form-check-input" type="checkbox" asp-for="DbEncrypt" id="dbEncryptCheck" />
+                            <input class="form-check-input" type="checkbox" asp-for="DbEncrypt" id="dbEncryptCheck" disabled />
                             <label class="form-check-label" for="dbEncryptCheck">تشفير الاتصال بقاعدة البيانات (SSL/TLS)</label>
                         </div>
-                        <small class="text-muted">إذا ظهر خطأ «SSL handshake failed» ارفع التحديد ثم احفظ وجرب التهيئة مرة أخرى.</small>
+                        <small class="text-muted">الاتصال حالياً دائماً <strong>بدون تشفير</strong> لتجنب خطأ SSL handshake. (الخيار معطّل.)</small>
                     </div>
                 </div>
 

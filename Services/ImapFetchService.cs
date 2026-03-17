@@ -33,8 +33,7 @@ namespace Wafek_Web_Manager.Services
                 var db = s.GetProperty("DbName").GetString();
                 var user = s.GetProperty("DbUser").GetString();
                 var pass = s.GetProperty("DbPassword").GetString();
-                var encrypt = s.TryGetProperty("DbEncrypt", out var enc) ? enc.GetBoolean() : false;
-                _connectionString = $"Server={server};Database={db};User Id={user};Password={pass};TrustServerCertificate=True;Encrypt={encrypt};Connect Timeout=30;";
+                _connectionString = $"Server={server};Database={db};User Id={user};Password={pass};TrustServerCertificate=True;Encrypt=False;Connect Timeout=30;";
 
                 if (s.TryGetProperty("ImapServer", out var im)) _imapServer = im.GetString() ?? "";
                 if (s.TryGetProperty("ImapPort", out var ip)) _imapPort = ip.GetInt32();
