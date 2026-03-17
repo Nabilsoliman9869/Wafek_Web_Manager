@@ -18,12 +18,13 @@ namespace Wafek_Web_Manager.Pages
                 if (System.IO.File.Exists(configPath))
                 {
                     var json = System.IO.File.ReadAllText(configPath);
-                    var settings = System.Text.Json.JsonSerializer.Deserialize<dynamic>(json);
+                    var settings = System.Text.Json.JsonSerializer.Deserialize<System.Text.Json.JsonElement>(json);
                     string server = settings.GetProperty("DbServer").GetString();
                     string db = settings.GetProperty("DbName").GetString();
                     string user = settings.GetProperty("DbUser").GetString();
                     string pass = settings.GetProperty("DbPassword").GetString();
-                    var encrypt = settings.TryGetProperty("DbEncrypt", out var enc) ? enc.GetBoolean() : true;
+                    System.Text.Json.JsonElement enc;
+                    var encrypt = settings.TryGetProperty("DbEncrypt", out enc) ? enc.GetBoolean() : true;
                     return $"Server={server};Database={db};User Id={user};Password={pass};TrustServerCertificate=True;Encrypt={encrypt};Connect Timeout=30;";
                 }
             }
