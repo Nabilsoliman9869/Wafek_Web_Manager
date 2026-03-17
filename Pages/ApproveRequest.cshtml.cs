@@ -27,7 +27,8 @@ namespace Wafek_Web_Manager.Pages
                     var db = s.GetProperty("DbName").GetString();
                     var user = s.GetProperty("DbUser").GetString();
                     var pass = s.GetProperty("DbPassword").GetString();
-                    return $"Server={server};Database={db};User Id={user};Password={pass};TrustServerCertificate=True;Encrypt=True;";
+                    var encrypt = s.TryGetProperty("DbEncrypt", out var enc) ? enc.GetBoolean() : true;
+                    return $"Server={server};Database={db};User Id={user};Password={pass};TrustServerCertificate=True;Encrypt={encrypt};";
                 }
             }
             catch { }

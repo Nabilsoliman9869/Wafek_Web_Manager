@@ -27,7 +27,8 @@ namespace Wafek_Web_Manager.Pages
                 {
                     var json = System.IO.File.ReadAllText(configPath);
                     var s = System.Text.Json.JsonSerializer.Deserialize<System.Text.Json.JsonElement>(json);
-                    return $"Server={s.GetProperty("DbServer").GetString()};Database={s.GetProperty("DbName").GetString()};User Id={s.GetProperty("DbUser").GetString()};Password={s.GetProperty("DbPassword").GetString()};TrustServerCertificate=True;Encrypt=True;";
+                    var encrypt = s.TryGetProperty("DbEncrypt", out var enc) ? enc.GetBoolean() : true;
+                    return $"Server={s.GetProperty("DbServer").GetString()};Database={s.GetProperty("DbName").GetString()};User Id={s.GetProperty("DbUser").GetString()};Password={s.GetProperty("DbPassword").GetString()};TrustServerCertificate=True;Encrypt={encrypt};";
                 }
             }
             catch { }

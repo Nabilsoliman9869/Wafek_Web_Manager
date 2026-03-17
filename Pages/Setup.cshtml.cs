@@ -23,6 +23,9 @@ namespace Wafek_Web_Manager.Pages
         public string DbUser { get; set; } = "LA7";
         [BindProperty]
         public string DbPassword { get; set; } = string.Empty;
+        /// <summary>استخدام تشفير SSL للاتصال بقاعدة البيانات. عند ظهور خطأ SSL handshake يمكن تعطيله.</summary>
+        [BindProperty]
+        public bool DbEncrypt { get; set; } = true;
 
         [BindProperty]
         public string SmtpServer { get; set; } = "smtp.gmail.com";
@@ -78,6 +81,7 @@ namespace Wafek_Web_Manager.Pages
                     if (settings.TryGetProperty("ImapEnabled", out System.Text.Json.JsonElement ie)) ImapEnabled = ie.GetBoolean();
                     if (settings.TryGetProperty("ImapServer", out System.Text.Json.JsonElement im)) ImapServer = im.GetString() ?? "imap.gmail.com";
                     if (settings.TryGetProperty("ImapPort", out System.Text.Json.JsonElement ip)) ImapPort = ip.GetInt32();
+                    if (settings.TryGetProperty("DbEncrypt", out System.Text.Json.JsonElement de)) DbEncrypt = de.GetBoolean();
                     if (string.IsNullOrEmpty(ApproveBaseUrl) && HttpContext?.Request != null)
                         ApproveBaseUrl = $"{HttpContext.Request.Scheme}://{HttpContext.Request.Host}";
                 }
@@ -162,7 +166,7 @@ namespace Wafek_Web_Manager.Pages
                 catch { }
             }
 
-            var settings = new { DbServer, DbName, DbUser, DbPassword, SmtpServer, SmtpPort, SenderEmail, SenderPassword = passwordToSave ?? "", EnableSsl, ApproveBaseUrl, ApproveUrlOverride, ImapEnabled, ImapServer, ImapPort };
+            var settings = new { DbServer, DbName, DbUser, DbPassword, DbEncrypt, SmtpServer, SmtpPort, SenderEmail, SenderPassword = passwordToSave ?? "", EnableSsl, ApproveBaseUrl, ApproveUrlOverride, ImapEnabled, ImapServer, ImapPort };
             var jsonOut = System.Text.Json.JsonSerializer.Serialize(settings, new System.Text.Json.JsonSerializerOptions { WriteIndented = true });
             System.IO.File.WriteAllText(configPath, jsonOut);
 
@@ -319,7 +323,7 @@ namespace Wafek_Web_Manager.Pages
                 UserID = DbUser,
                 Password = DbPassword,
                 TrustServerCertificate = true,
-                Encrypt = true,
+                Encrypt = DbEncrypt,
                 ConnectTimeout = 30
             };
             return builder.ConnectionString;

@@ -19,7 +19,8 @@ namespace Wafek_Web_Manager.Pages
                     string db = settings.GetProperty("DbName").GetString() ?? "";
                     string user = settings.GetProperty("DbUser").GetString() ?? "";
                     string pass = settings.GetProperty("DbPassword").GetString() ?? "";
-                    return $"Server={server};Database={db};User Id={user};Password={pass};TrustServerCertificate=True;Encrypt=True;Connect Timeout=30;";
+                    var encrypt = settings.TryGetProperty("DbEncrypt", out var enc) ? enc.GetBoolean() : true;
+                    return $"Server={server};Database={db};User Id={user};Password={pass};TrustServerCertificate=True;Encrypt={encrypt};Connect Timeout=30;";
                 }
             }
             catch { }
