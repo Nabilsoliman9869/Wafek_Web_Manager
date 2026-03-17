@@ -741,7 +741,7 @@ WHERE h.BondGuide = @id", conn);
 <table role=""presentation"" cellpadding=""0"" cellspacing=""0"" width=""100%"" style=""background:#e8e8e8;padding:20px 0""><tr><td align=""center"">
 <table role=""presentation"" cellpadding=""0"" cellspacing=""0"" width=""600"" style=""max-width:100%;background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.08);border:4px solid {ThemeColor}"">
 <tr><td style=""padding:0"">
-{(string.IsNullOrEmpty(logoImg) ? "" : $@"<img src=""{logoImg}"" width=""600"" style=""display:block;width:100%;max-width:600px;height:auto"" alt=""Logo""/>")}
+{(string.IsNullOrEmpty(logoImg) ? "" : $@"<img src=""{logoImg}"" width=""600"" style=""display:block;width:100%;max-width:600px;height:auto"" alt="""" />")}
 </td></tr>
 <tr><td style=""padding:20px 24px;background:#fff"">
 <h2 style=""margin:0 0 16px;font-size:20px;color:#333;border-bottom:3px solid {ThemeColor};padding-bottom:10px"">نتيجة تنفيذ الأمر <span style=""color:{ThemeColor}"">{commandCode}</span></h2>

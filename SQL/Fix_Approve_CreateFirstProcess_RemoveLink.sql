@@ -46,6 +46,7 @@ BEGIN
     DECLARE @AgentGuide uniqueidentifier
     DECLARE @subject nvarchar(max)
     DECLARE @body nvarchar(Max)
+    DECLARE @DetailsBlock nvarchar(max) = N''
 
     SET @emailSendDate = CONVERT(nvarchar(30), GETDATE(), 120)
     SET @MainRoot = (SELECT MainRoor FROM Approve_Email WHERE ID = 1)
@@ -85,6 +86,14 @@ BEGIN
     END
 
     SET @StageGuide = (SELECT StageGuide FROM Approve_Stage WHERE MainGuide = @MainGuid AND Stage_Num = 1)
+
+    -- تفاصيل سند (TBL038) عند Type=1: عدد الأسطر والمبلغ (MainGuide = TBL010.CardGuide، المبلغ من DebitRate+CreditRate)
+    IF (@Type = 1)
+    BEGIN
+        SELECT @DetailsBlock = N'<p style="margin:10px 0;padding:8px;background:#fff;border:1px solid #ddd;border-radius:6px;text-align:right;direction:rtl">عدد الأسطر: <b>' + CAST(COUNT(*) AS nvarchar(10)) + N'</b> | المبلغ الإجمالي: <b>' + ISNULL(CAST(SUM(ISNULL(DebitRate,0)+ISNULL(CreditRate,0)) AS nvarchar(30)), N'0') + N'</b></p>'
+        FROM TBL038 WHERE MainGuide = @Guide
+        IF (@DetailsBlock IS NULL) SET @DetailsBlock = N''
+    END
 
     IF (@StageGuide IS NOT NULL)
     BEGIN
@@ -129,7 +138,7 @@ BEGIN
                     ELSE IF (@Type = 4) SET @EntryName = (SELECT CardName FROM Tbl014 WHERE CardGuide = @MainGuid)
                     IF (@UserNameSender IS NULL) SET @UserNameSender = (SELECT AgentName FROM TBL016 WHERE CardGuide = @sender)
                     SET @subject = N'طلب الموافقة على ' + ISNULL(@EntryName, '') + N', المرسل ' + ISNULL(@UserNameSender, '')
-                    SET @body = N'<!DOCTYPE html><html lang=ar dir=rtl><head><meta charset=UTF-8/><title>Xtra | Wafek</title></head><body><table style="background:#f1f1f1;border:solid 8px #32b380;border-radius:20px;margin:10px auto;max-width:500px"><tr><td><img src=https://i.ibb.co/NynTy6Q/xtra-wafek-logo.png width=300 style="margin:15px 10px"/><h1 style="font-weight:bold;font-size:25px">طلب موافقة | <span style="color:#32b380">نظام وافق</span></h1><p style="background:#f1f1f1;text-align:right;margin:10px;direction:rtl">إلى السيد: <b>' + @SendToName + '</b><br/>نوع البطاقة: <b>' + ISNULL(@EntryName, '') + '</b> | رقمها: <b>' + @CardNumber + '</b><br/>تاريخ إرسال الطلب: <b>' + @emailSendDate + '</b><br/>المرسل: <b>' + ISNULL(@UserNameSender, '') + '</b><br/>شركة: <b>' + ISNULL(@CompanyName, '') + '</b><br/>هاتف: <b>' + ISNULL(@CompanyPhone, '') + '</b></p><p style="color:#128ab5;text-align:right;margin:10px;background:#f1f1f1">ملاحظات الطلب: <b>' + ISNULL(@Note, '') + '</b></p><p style="font-size:14px;font-weight:bold;margin-top:20px;text-align:center;background:#e8f5e9;padding:14px;border-radius:10px;border:2px solid #22c55e">للرد: أعد الإرسال (Reply) على هذا الميل واكتب في الموضوع أو الجسد:</p><p style="font-size:16px;text-align:center;margin:8px 0;letter-spacing:2px"><b>#1#</b> موافق &nbsp; <b>#2#</b> مرفوض &nbsp; <b>#3#</b> يؤجل</p><p style="font-size:12px;text-align:center;color:#555">مثال: اكتب #1# للموافقة أو #2# للرفض أو #3# للتأجيل.</p></td></tr></table></body></html>'
+                    SET @body = N'<!DOCTYPE html><html lang=ar dir=rtl><head><meta charset=UTF-8/><title>Xtra | Wafek</title></head><body><table style="background:#f1f1f1;border:solid 8px #32b380;border-radius:20px;margin:10px auto;max-width:500px"><tr><td><img src="https://i.ibb.co/NynTy6Q/xtra-wafek-logo.png" width="300" style="margin:15px 10px" alt="" /><h1 style="font-weight:bold;font-size:25px">طلب موافقة | <span style="color:#32b380">نظام وافق</span></h1><p style="background:#f1f1f1;text-align:right;margin:10px;direction:rtl">إلى السيد: <b>' + @SendToName + '</b><br/>نوع البطاقة: <b>' + ISNULL(@EntryName, '') + '</b> | رقمها: <b>' + @CardNumber + '</b><br/>تاريخ إرسال الطلب: <b>' + @emailSendDate + '</b><br/>المرسل: <b>' + ISNULL(@UserNameSender, '') + '</b><br/>شركة: <b>' + ISNULL(@CompanyName, '') + '</b><br/>هاتف: <b>' + ISNULL(@CompanyPhone, '') + '</b></p><p style="color:#128ab5;text-align:right;margin:10px;background:#f1f1f1">ملاحظات الطلب: <b>' + ISNULL(@Note, '') + '</b></p>' + ISNULL(@DetailsBlock, N'') + N'<p style="font-size:14px;font-weight:bold;margin-top:20px;text-align:center;background:#e8f5e9;padding:14px;border-radius:10px;border:2px solid #22c55e">للرد: أعد الإرسال (Reply) على هذا الميل واكتب في الموضوع أو الجسد:</p><p style="font-size:16px;text-align:center;margin:8px 0;letter-spacing:2px"><b>#1#</b> موافق &nbsp; <b>#2#</b> مرفوض &nbsp; <b>#3#</b> يؤجل</p><p style="font-size:12px;text-align:center;color:#555">مثال: اكتب #1# للموافقة أو #2# للرفض أو #3# للتأجيل.</p></td></tr></table></body></html>'
                 END
                 ELSE
                 BEGIN
@@ -139,7 +148,7 @@ BEGIN
                     ELSE IF (@Type = 4) SET @EntryName = (SELECT LatinName FROM Tbl014 WHERE CardGuide = @MainGuid)
                     IF (@UserNameSender IS NULL) SET @UserNameSender = (SELECT LatinName FROM TBL016 WHERE CardGuide = @sender)
                     SET @subject = N'Request for Approval of ' + ISNULL(@EntryName, '') + N', Sender ' + ISNULL(@UserNameSender, '')
-                    SET @body = N'<!DOCTYPE html><html lang=en dir=ltr><head><meta charset=UTF-8/><title>Xtra | Wafek</title></head><body><table style="background:#f1f1f1;border:solid 8px #32b380;border-radius:20px;margin:10px auto;max-width:500px"><tr><td><img src=https://i.ibb.co/NynTy6Q/xtra-wafek-logo.png width=300 style="margin:15px 10px"/><h1 style="font-weight:bold;font-size:25px">Request for Approval | <span style="color:#32b380">Wafek System</span></h1><p style="background:#f1f1f1;text-align:left;margin:10px">To Mr: <b>' + @SendToName + '</b><br/>Card Type: <b>' + ISNULL(@EntryName, '') + '</b> | Card Number: <b>' + @CardNumber + '</b><br/>Request Send Date: <b>' + @emailSendDate + '</b><br/>Sender: <b>' + ISNULL(@UserNameSender, '') + '</b><br/>Company: <b>' + ISNULL(@CompanyName, '') + '</b><br/>Phone: <b>' + ISNULL(@CompanyPhone, '') + '</b></p><p style="color:#128ab5;text-align:left;margin:10px;background:#f1f1f1">Request Notes: <b>' + ISNULL(@Note, '') + '</b></p><p style="font-size:14px;font-weight:bold;margin-top:20px;text-align:center;background:#e8f5e9;padding:14px;border-radius:10px;border:2px solid #22c55e">To reply: Reply to this email and type in subject or body:</p><p style="font-size:16px;text-align:center;margin:8px 0;letter-spacing:2px"><b>#1#</b> Approved &nbsp; <b>#2#</b> Rejected &nbsp; <b>#3#</b> Postponed</p><p style="font-size:12px;text-align:center;color:#555">Example: type #1# to approve, #2# to reject, #3# to postpone.</p></td></tr></table></body></html>'
+                    SET @body = N'<!DOCTYPE html><html lang=en dir=ltr><head><meta charset=UTF-8/><title>Xtra | Wafek</title></head><body><table style="background:#f1f1f1;border:solid 8px #32b380;border-radius:20px;margin:10px auto;max-width:500px"><tr><td><img src="https://i.ibb.co/NynTy6Q/xtra-wafek-logo.png" width="300" style="margin:15px 10px" alt="" /><h1 style="font-weight:bold;font-size:25px">Request for Approval | <span style="color:#32b380">Wafek System</span></h1><p style="background:#f1f1f1;text-align:left;margin:10px">To Mr: <b>' + @SendToName + '</b><br/>Card Type: <b>' + ISNULL(@EntryName, '') + '</b> | Card Number: <b>' + @CardNumber + '</b><br/>Request Send Date: <b>' + @emailSendDate + '</b><br/>Sender: <b>' + ISNULL(@UserNameSender, '') + '</b><br/>Company: <b>' + ISNULL(@CompanyName, '') + '</b><br/>Phone: <b>' + ISNULL(@CompanyPhone, '') + '</b></p><p style="color:#128ab5;text-align:left;margin:10px;background:#f1f1f1">Request Notes: <b>' + ISNULL(@Note, '') + '</b></p>' + ISNULL(@DetailsBlock, N'') + N'<p style="font-size:14px;font-weight:bold;margin-top:20px;text-align:center;background:#e8f5e9;padding:14px;border-radius:10px;border:2px solid #22c55e">To reply: Reply to this email and type in subject or body:</p><p style="font-size:16px;text-align:center;margin:8px 0;letter-spacing:2px"><b>#1#</b> Approved &nbsp; <b>#2#</b> Rejected &nbsp; <b>#3#</b> Postponed</p><p style="font-size:12px;text-align:center;color:#555">Example: type #1# to approve, #2# to reject, #3# to postpone.</p></td></tr></table></body></html>'
                 END
 
                 EXEC Email 'XtraMail', @_emilusr, @subject, @body
@@ -153,4 +162,5 @@ BEGIN
 END
 GO
 
-PRINT N'تم إعادة إنشاء الإجراء Approve_CreateFirstProcess بدون الرابط.';
+PRINT N'تم إعادة إنشاء الإجراء Approve_CreateFirstProcess.';
+PRINT N'نفّذ هذا السكربت على نفس قاعدة البيانات التي يستخدمها إكسترا عند إرسال ميل الموافقة.';
