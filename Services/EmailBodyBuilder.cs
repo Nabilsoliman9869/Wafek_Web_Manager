@@ -108,6 +108,9 @@ namespace Wafek_Web_Manager.Services
                             LoadTbl010Fallback(conn, sourceId, data);
                         }
                         LoadTbl010ExtendedFromXml(conn, sourceId, data);
+                        // احتياطي: الحساب من أول سطر تفاصيل إن كان الرأس فارغاً (سند 10+38)
+                        if (string.IsNullOrEmpty(data.AccountName) && data.BondDetails?.Count > 0)
+                            data.AccountName = data.BondDetails[0].AccountName ?? "";
                     }
                     catch
                     {
@@ -287,6 +290,18 @@ WHERE d.MainGuide = @id", conn);
                     data.BondDate = dt;
             }
             catch { }
+            if (data.BondDate == default)
+            {
+                try
+                {
+                    var dtCmd2 = new SqlCommand("SELECT TOP 1 InDate FROM TBL010 WHERE CardGuide = @id", conn);
+                    dtCmd2.Parameters.AddWithValue("@id", sourceId);
+                    var v2 = dtCmd2.ExecuteScalar();
+                    if (v2 != null && v2 != DBNull.Value && DateTime.TryParse(v2.ToString(), out var dt2))
+                        data.BondDate = dt2;
+                }
+                catch { }
+            }
 
             try
             {
@@ -306,18 +321,17 @@ WHERE d.MainGuide = @id", conn);
             }
             catch { }
 
-            // 1) TBL011/TBL012 — سند قبض/صرف غالباً يستخدم هذا الهيكل (BondGuide = TBL010.CardGuide)
+            // 1) TBL038 — المصدر الرئيسي: 10=رأس، 38=تفاصيل (MainGuide = TBL010.CardGuide)
             try
             {
                 var detCmd = new SqlCommand(@"
 SELECT TBL004.AccountName AS [الحساب],
-    SUM(ISNULL(d.Debit,0)+ISNULL(d.DebitRate,0)) AS [مدين],
-    SUM(ISNULL(d.Credit,0)+ISNULL(d.CreditRate,0)) AS [دائن],
-    MAX(ISNULL(d.Description,d.Notes)) AS [البيان]
-FROM TBL011 h
-INNER JOIN TBL012 d ON h.CardGuide = d.MainGuide
+    SUM(ISNULL(d.DebitRate,0)) AS [مدين],
+    SUM(ISNULL(d.CreditRate,0)) AS [دائن],
+    MAX(ISNULL(d.TruncatedNotes,d.Notes)) AS [البيان]
+FROM TBL038 d
 LEFT JOIN TBL004 ON d.AccountGuide = TBL004.CardGuide
-WHERE h.BondGuide = @id AND (h.Posted = 1 OR h.Posted IS NULL)
+WHERE d.MainGuide = @id
 GROUP BY TBL004.AccountName", conn);
                 detCmd.Parameters.AddWithValue("@id", sourceId);
                 using var rd = detCmd.ExecuteReader();
@@ -342,45 +356,7 @@ GROUP BY TBL004.AccountName", conn);
             }
             catch { }
 
-            // 2) TBL038 — استعلام مجمع حسب الحساب
-            if (data.BondDetails.Count == 0)
-            {
-            try
-            {
-                var detCmd = new SqlCommand(@"
-SELECT TBL004.AccountName AS [الحساب],
-    SUM(ISNULL(d.DebitRate,0)) AS [مدين],
-    SUM(ISNULL(d.CreditRate,0)) AS [دائن],
-    MAX(ISNULL(d.TruncatedNotes,d.Notes)) AS [البيان]
-FROM TBL038 d
-LEFT JOIN TBL004 ON d.AccountGuide = TBL004.CardGuide
-WHERE d.MainGuide = @CardGuide
-GROUP BY TBL004.AccountName", conn);
-                detCmd.Parameters.AddWithValue("@CardGuide", sourceId);
-                using var rd = detCmd.ExecuteReader();
-                decimal sum = 0;
-                while (rd.Read())
-                {
-                    var debit = rd.FieldCount > 1 ? GetDecimalByOrdinal(rd, 1) : 0;
-                    var credit = rd.FieldCount > 2 ? GetDecimalByOrdinal(rd, 2) : 0;
-                    sum += debit + credit;
-                    data.BondDetails.Add(new BondDetailRow
-                    {
-                        AccountCode = "",
-                        AccountName = rd.FieldCount > 0 ? (rd.GetValue(0)?.ToString() ?? "") : "",
-                        Debit = debit,
-                        Credit = credit,
-                        Notes = rd.FieldCount > 3 ? (rd.GetValue(3)?.ToString() ?? "") : "",
-                        CostCenterName = ""
-                    });
-                }
-                if (data.BondDetails.Count > 0 && string.IsNullOrEmpty(data.TotalAmount) && sum != 0)
-                    data.TotalAmount = sum.ToString("N2");
-            }
-            catch { }
-            }
-
-            // 3) احتياطي: تفاصيل سطر بسطر (بدون تجميع)
+            // 2) احتياطي: TBL038 سطر بسطر (بدون تجميع)
             if (data.BondDetails.Count == 0)
             {
                 try
@@ -453,6 +429,20 @@ WHERE h.BondGuide = @id", conn);
                         data.TotalAmount = sum.ToString("N2");
                 }
                 catch { }
+            }
+
+            // احتياطي نهائي: سند بسيط — من الرأس فقط (حساب واحد + مجموع)
+            if (data.BondDetails.Count == 0 && !string.IsNullOrEmpty(data.AccountName) && !string.IsNullOrEmpty(data.TotalAmount) && decimal.TryParse(data.TotalAmount.Replace(",", ""), System.Globalization.NumberStyles.Any, null, out var simpleAmt) && simpleAmt != 0)
+            {
+                data.BondDetails.Add(new BondDetailRow
+                {
+                    AccountCode = "",
+                    AccountName = data.AccountName,
+                    Debit = 0,
+                    Credit = simpleAmt,
+                    Notes = data.Notes ?? "",
+                    CostCenterName = data.CostCenterName ?? ""
+                });
             }
         }
 
@@ -648,6 +638,7 @@ WHERE h.BondGuide = @id", conn);
 <tr><td style=""padding:4px 8px"">المشروع:</td><td style=""border:1px solid #999;padding:6px 8px;background:#fff"">{project}</td><td style=""padding:4px 8px"">العملة:</td><td style=""border:1px solid #999;padding:6px 8px;background:#fff"">{currency}</td></tr>
 <tr><td style=""padding:4px 8px;font-weight:bold"">الحساب:</td><td colspan=""3"" style=""border:1px solid #999;padding:8px;background:#fff;font-weight:bold;font-size:12px"">{account}</td></tr>
 <tr><td style=""padding:4px 8px"">ملاحظات:</td><td colspan=""3"" style=""border:1px solid #999;padding:6px 8px;background:#fff"">{notes}</td></tr>
+<tr><td style=""padding:4px 8px;font-weight:bold"">المبلغ:</td><td colspan=""3"" style=""border:1px solid #999;padding:6px 8px;background:#fff;font-weight:bold"">{total} {currency}</td></tr>
 </table>
 {gridHtml}
 <div style=""margin-top:14px;padding:8px 12px;background:#d8d8d8;font-weight:bold;font-size:12px;display:flex;justify-content:space-between""><span>المجموع</span><span style=""font-family:Calibri,Tahoma"">{total}</span></div>
@@ -711,14 +702,17 @@ WHERE h.BondGuide = @id", conn);
             var summaryBlock = $@"<p style=""background:#f1f1f1;text-align:right;margin:10px;direction:rtl"">إلى السيد: <b>{recipientName}</b><br/>نوع البطاقة: <b>{cardName}</b> | رقمها: <b>{cardNum}</b><br/>تاريخ إرسال الطلب: <b>{sendDate}</b><br/>المرسل: <b>{sender}</b><br/>شركة: <b>{company}</b><br/>هاتف: <b>{phone}</b></p><p style=""color:#128ab5;text-align:right;margin:10px;background:#f1f1f1"">ملاحظات: <b>{notes}</b></p>";
             var docBlock = string.IsNullOrWhiteSpace(documentBlock) ? "" : $@"<div style=""margin:16px 0;padding:12px;background:#fff;border:1px solid #ddd;overflow-x:auto"">{documentBlock}</div>";
             var sep = approveLink?.Contains("?") == true ? "&" : "?";
+            var replyInstruction = $@"<p style=""font-size:13px;font-weight:bold;margin-top:16px;text-align:center;background:#e8f5e9;padding:12px;border-radius:8px"">للرد: <b>أعد الإرسال (Reply)</b> واكتب <code>#1#</code> موافق | <code>#2#</code> مرفوض | <code>#3#</code> يؤجل</p>";
             var linkBlock = string.IsNullOrEmpty(approveLink)
-                ? $@"<p style=""font-size:13px;font-weight:bold;margin-top:16px;margin-bottom:8px;text-align:center"">للرد: أعد الإرسال على هذا الميل واكتب 1 أو 2 أو 3</p>"
+                ? replyInstruction
                 : $@"<p style=""font-size:14px;font-weight:bold;margin-top:20px;text-align:center"">اضغط للرد مباشرة:</p>
-<table role=""presentation"" cellpadding=""0"" cellspacing=""10"" align=""center"" style=""margin:20px auto""><tr>
+<table role=""presentation"" cellpadding=""0"" cellspacing=""10"" align=""center"" style=""margin:16px auto""><tr>
 <td><a href=""{approveLink}{sep}action=Approved"" style=""display:inline-block;padding:14px 24px;background:#22c55e;color:#fff!important;font-weight:bold;font-size:15px;text-decoration:none;border-radius:10px"" target=""_blank"">✓ موافق</a></td>
 <td><a href=""{approveLink}{sep}action=Rejected"" style=""display:inline-block;padding:14px 24px;background:#ef4444;color:#fff!important;font-weight:bold;font-size:15px;text-decoration:none;border-radius:10px"" target=""_blank"">✗ رفض</a></td>
 <td><a href=""{approveLink}{sep}action=Postponed"" style=""display:inline-block;padding:14px 24px;background:#f59e0b;color:#fff!important;font-weight:bold;font-size:15px;text-decoration:none;border-radius:10px"" target=""_blank"">⏳ يؤجل</a></td>
-</tr></table>";
+</tr></table>
+{replyInstruction}
+<p style=""font-size:11px;text-align:center;color:#666"">أو أعد الإرسال واكتب #1# أو #2# أو #3#</p>";
 
             return $@"<!DOCTYPE html><html lang=""ar"" dir=""rtl""><head><meta charset=""UTF-8""/><meta name=""viewport"" content=""width=device-width,initial-scale=1""/><title>نظام وافق | طلب موافقة</title></head><body style=""margin:0;padding:0;background:#e8e8e8;font-family:Arial,sans-serif"">
 <table role=""presentation"" cellpadding=""0"" cellspacing=""0"" width=""100%"" style=""background:#e8e8e8;padding:20px 0""><tr><td align=""center"">
@@ -775,14 +769,17 @@ WHERE h.BondGuide = @id", conn);
             var summaryBlock = $@"<p style=""background:#f1f1f1;text-align:left;margin:10px"">To Mr: <b>{recipientName}</b><br/>Card Type: <b>{cardName}</b> | Card Number: <b>{cardNum}</b><br/>Request Send Date: <b>{sendDate}</b><br/>Sender: <b>{sender}</b><br/>Company: <b>{company}</b><br/>Phone: <b>{phone}</b></p><p style=""color:#128ab5;text-align:left;margin:10px;background:#f1f1f1"">Notes: <b>{notes}</b></p>";
             var docBlock = string.IsNullOrWhiteSpace(documentBlock) ? "" : $@"<div style=""margin:16px 0;padding:12px;background:#fff;border:1px solid #ddd;overflow-x:auto"">{documentBlock}</div>";
             var linkSep = approveLink?.Contains("?") == true ? "&" : "?";
+            var replyInstructionEn = $@"<p style=""font-size:13px;font-weight:bold;margin-top:16px;text-align:center;background:#e8f5e9;padding:12px;border-radius:8px"">To reply: <b>Reply</b> and type <code>#1#</code> Approved | <code>#2#</code> Rejected | <code>#3#</code> Postponed</p>";
             var linkBlock = string.IsNullOrEmpty(approveLink)
-                ? $@"<p style=""font-size:13px;font-weight:bold;margin-top:16px;margin-bottom:8px;text-align:center"">To reply: Reply to this email and type 1, 2, or 3</p>"
+                ? replyInstructionEn
                 : $@"<p style=""font-size:14px;font-weight:bold;margin-top:20px;text-align:center"">Click to reply:</p>
-<table role=""presentation"" cellpadding=""0"" cellspacing=""10"" align=""center"" style=""margin:20px auto""><tr>
+<table role=""presentation"" cellpadding=""0"" cellspacing=""10"" align=""center"" style=""margin:16px auto""><tr>
 <td><a href=""{approveLink}{linkSep}action=Approved"" style=""display:inline-block;padding:14px 24px;background:#22c55e;color:#fff!important;font-weight:bold;font-size:15px;text-decoration:none;border-radius:10px"" target=""_blank"">✓ Approved</a></td>
 <td><a href=""{approveLink}{linkSep}action=Rejected"" style=""display:inline-block;padding:14px 24px;background:#ef4444;color:#fff!important;font-weight:bold;font-size:15px;text-decoration:none;border-radius:10px"" target=""_blank"">✗ Rejected</a></td>
 <td><a href=""{approveLink}{linkSep}action=Postponed"" style=""display:inline-block;padding:14px 24px;background:#f59e0b;color:#fff!important;font-weight:bold;font-size:15px;text-decoration:none;border-radius:10px"" target=""_blank"">⏳ Postponed</a></td>
-</tr></table>";
+</tr></table>
+{replyInstructionEn}
+<p style=""font-size:11px;text-align:center;color:#666"">Or reply and type #1# or #2# or #3#</p>";
 
             return $@"<!DOCTYPE html><html lang=""en"" dir=""ltr""><head><meta charset=""UTF-8""/><meta name=""viewport"" content=""width=device-width,initial-scale=1""/><title>Wafek System | Approval Request</title></head><body style=""margin:0;padding:0;background:#e8e8e8;font-family:Arial,sans-serif"">
 <table role=""presentation"" cellpadding=""0"" cellspacing=""0"" width=""100%"" style=""background:#e8e8e8;padding:20px 0""><tr><td align=""center"">

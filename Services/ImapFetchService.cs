@@ -205,13 +205,17 @@ namespace Wafek_Web_Manager.Services
             return m.Success ? "*" + m.Groups[1].Value + "*" : "";
         }
 
-        /// <summary>استخراج رد الموافقة من نص الميل — 1/موافق، 2/رفض، 3/يؤجل</summary>
+        /// <summary>استخراج رد الموافقة من نص الميل — #1#/موافق، #2#/مرفوض، #3#/يؤجل</summary>
         static string? ExtractApprovalResponse(string text)
         {
             if (string.IsNullOrWhiteSpace(text)) return null;
             var t = text.Trim();
             var tl = t.ToLowerInvariant();
-            // القيم الرقمية
+            // الصيغة الصريحة #1# #2# #3# (أولوية)
+            if (tl.Contains("#1#")) return "Approved";
+            if (tl.Contains("#2#")) return "Rejected";
+            if (tl.Contains("#3#")) return "Postponed";
+            // القيم الرقمية والنصية
             if (Regex.IsMatch(t, @"\b1\b") || tl.Contains("موافق") || tl.Contains("approved") || tl.Contains("*#approve")) return "Approved";
             if (Regex.IsMatch(t, @"\b2\b") || tl.Contains("رفض") || tl.Contains("غير موافق") || tl.Contains("مرفوض") || tl.Contains("rejected") || tl.Contains("*#reject")) return "Rejected";
             if (Regex.IsMatch(t, @"\b3\b") || tl.Contains("يؤجل") || tl.Contains("postponed") || tl.Contains("*#postpone")) return "Postponed";

@@ -146,27 +146,23 @@ namespace Wafek_Web_Manager.Services
             }
         }
 
+        /// <summary>معالجة رد الموافقة (#1# #2# #3#) — مسار SQL: Approve_ProcessResponse → Approve_OnApproved</summary>
         private async Task<(bool Ok, string Message)> ProcessApprovalReplyAsync(long logId, string responseType)
         {
             try
             {
                 using var conn = new SqlConnection(_connectionString);
                 await conn.OpenAsync();
-                using var check = new SqlCommand("SELECT 1 FROM WF_Logs WHERE Id = @id AND Status = 'WaitingForResponse'", conn);
+                using var check = new SqlCommand("SELECT 1 FROM WF_Logs WHERE Id = @id AND Status IN ('Pending', 'WaitingForResponse')", conn);
                 check.Parameters.AddWithValue("@id", logId);
                 if (await check.ExecuteScalarAsync() == null)
                     return (false, "الطلب غير موجود أو تمت معالجته مسبقاً.");
 
-                if (_responseExecutor != null)
-                {
-                    await _responseExecutor.ProcessResponseAsync(logId, responseType, _connectionString);
-                    return (true, responseType == "Approved" ? "تمت الموافقة." : responseType == "Rejected" ? "تم الرفض." : "تم التأجيل.");
-                }
-
-                using var proc = new SqlCommand("EXEC Approve_ProcessResponse @LogId, @ResponseType", conn);
+                // مسار SQL — Approve_ProcessResponse يستدعي Approve_OnApproved/OnRejected حسب SourceTable و SourceRecordId
+                using var proc = new SqlCommand("EXEC Approve_ProcessResponse @LogId, @ResponseType", conn) { CommandTimeout = 30 };
                 proc.Parameters.AddWithValue("@LogId", logId);
                 proc.Parameters.AddWithValue("@ResponseType", responseType);
-                proc.ExecuteNonQuery();
+                await proc.ExecuteNonQueryAsync();
                 return (true, responseType == "Approved" ? "تمت الموافقة." : responseType == "Rejected" ? "تم الرفض." : "تم التأجيل.");
             }
             catch (Exception ex)

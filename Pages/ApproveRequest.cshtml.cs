@@ -195,13 +195,29 @@ namespace Wafek_Web_Manager.Pages
         }
 
         /// <summary>
-        /// معالجة الرد — من ActionConfigJson إن وُجد، وإلا من الإجراء المخزن
+        /// معالجة الرد — مسار SQL أولاً (نفس الرد بالميل): Approve_ProcessResponse → Approve_OnApproved/OnRejected.
+        /// إن فشل الإجراء (مثلاً غير منشور) يُستدعى ResponseActionExecutor ثم احتياطي UPDATE.
         /// </summary>
         private void ProcessResponse(long logId, string responseType, string? responseText)
         {
             var connStr = GetConnectionString();
             if (string.IsNullOrEmpty(connStr)) return;
 
+            // 1) مسار SQL — روابط ريندر والرد بالميل يستخدمان نفس المنطق
+            try
+            {
+                using var conn = new SqlConnection(connStr);
+                conn.Open();
+                var cmd = new SqlCommand("EXEC Approve_ProcessResponse @LogId, @ResponseType", conn);
+                cmd.CommandTimeout = 30;
+                cmd.Parameters.AddWithValue("@LogId", logId);
+                cmd.Parameters.AddWithValue("@ResponseType", responseType);
+                cmd.ExecuteNonQuery();
+                return;
+            }
+            catch { }
+
+            // 2) احتياطي C#
             if (_responseExecutor != null)
             {
                 try
@@ -212,39 +228,27 @@ namespace Wafek_Web_Manager.Pages
                 catch { }
             }
 
+            // 3) احتياطي UPDATE بسيط على WF_Logs
             try
             {
                 using var conn = new SqlConnection(connStr);
                 conn.Open();
-                var cmd = new SqlCommand("EXEC Approve_ProcessResponse @LogId, @ResponseType", conn);
-                cmd.CommandTimeout = 30;
-                cmd.Parameters.AddWithValue("@LogId", logId);
-                cmd.Parameters.AddWithValue("@ResponseType", responseType);
+                var msg = responseType switch
+                {
+                    "Approved" => "تمت الموافقة من الرابط",
+                    "Rejected" => "تم الرفض من الرابط",
+                    "Postponed" => "تم التأجيل من الرابط",
+                    _ => responseType
+                };
+                if (!string.IsNullOrWhiteSpace(responseText))
+                    msg = msg + " | " + responseText.Trim();
+                var cmd = new SqlCommand("UPDATE WF_Logs SET Status = @s, LastActionLog = @m, LastUpdatedDate = GETDATE() WHERE Id = @id", conn);
+                cmd.Parameters.AddWithValue("@s", responseType);
+                cmd.Parameters.AddWithValue("@m", msg);
+                cmd.Parameters.AddWithValue("@id", logId);
                 cmd.ExecuteNonQuery();
             }
-            catch
-            {
-                try
-                {
-                    using var conn = new SqlConnection(connStr);
-                    conn.Open();
-                    var msg = responseType switch
-                    {
-                        "Approved" => "تمت الموافقة من الرابط",
-                        "Rejected" => "تم الرفض من الرابط",
-                        "Postponed" => "تم التأجيل من الرابط",
-                        _ => responseType
-                    };
-                    if (!string.IsNullOrWhiteSpace(responseText))
-                        msg = msg + " | " + responseText.Trim();
-                    var cmd = new SqlCommand("UPDATE WF_Logs SET Status = @s, LastActionLog = @m, LastUpdatedDate = GETDATE() WHERE Id = @id", conn);
-                    cmd.Parameters.AddWithValue("@s", responseType);
-                    cmd.Parameters.AddWithValue("@m", msg);
-                    cmd.Parameters.AddWithValue("@id", logId);
-                    cmd.ExecuteNonQuery();
-                }
-                catch { }
-            }
+            catch { }
         }
 
         public class ApproveRequestDto
