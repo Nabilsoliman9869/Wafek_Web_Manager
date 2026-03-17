@@ -10,6 +10,7 @@ FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS runtime
 WORKDIR /app
 
 COPY --from=build /app/publish .
+COPY --from=build /src/SQL ./SQL
 COPY render-entrypoint.sh .
 RUN chmod +x render-entrypoint.sh
 
