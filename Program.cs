@@ -77,5 +77,7 @@ app.UseRouting();
 app.UseAuthorization();
 
 app.MapRazorPages();
+// لوب الصحة — حتى تعتبر Render الخدمة قيد التشغيل ولا تعيد التشغيل بشكل متكرر
+app.MapGet("/health", () => Results.Ok(new { status = "ok" }));
 
 app.Run();

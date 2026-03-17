@@ -2,11 +2,9 @@ bin/
 obj/
 .git/
 .gitignore
-*.md
 .vs/
 .vscode/
 *.user
 *.log
 render.yaml
 appsettings.custom.json
-*.sql
