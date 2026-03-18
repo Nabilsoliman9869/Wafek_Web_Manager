@@ -204,7 +204,7 @@ namespace Wafek_Web_Manager.Services
                     using var execConn = new SqlConnection(_connectionString);
                     execConn.Open();
                     using var exec = new SqlCommand(content.Trim(), execConn) { CommandType = System.Data.CommandType.StoredProcedure, CommandTimeout = 120 };
-                    using var ad = new Microsoft.Data.SqlClient.SqlDataAdapter(exec);
+                    using var ad = new SqlDataAdapter(exec);
                     var dt = new System.Data.DataTable();
                     ad.Fill(dt);
                     return ("Success", DataTableToHtml(dt));
@@ -215,7 +215,7 @@ namespace Wafek_Web_Manager.Services
                     using var execConn = new SqlConnection(_connectionString);
                     execConn.Open();
                     using var exec = new SqlCommand(content.Trim(), execConn) { CommandTimeout = 120 };
-                    using var ad = new Microsoft.Data.SqlClient.SqlDataAdapter(exec);
+                    using var ad = new SqlDataAdapter(exec);
                     var dt = new System.Data.DataTable();
                     ad.Fill(dt);
                     return ("Success", DataTableToHtml(dt));
