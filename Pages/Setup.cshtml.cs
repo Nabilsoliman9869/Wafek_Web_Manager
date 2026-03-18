@@ -315,17 +315,7 @@ namespace Wafek_Web_Manager.Pages
 
         private string BuildConnectionString()
         {
-            var builder = new SqlConnectionStringBuilder
-            {
-                DataSource = DbServer,
-                InitialCatalog = DbName,
-                UserID = DbUser,
-                Password = DbPassword,
-                TrustServerCertificate = true,
-                Encrypt = false, // Must be false to completely avoid Error 35 on some older SQL versions
-                ConnectTimeout = 30
-            };
-            return builder.ConnectionString;
+            return $"Server={DbServer};Database={DbName};User Id={DbUser};Password={DbPassword};TrustServerCertificate=True;Encrypt=False;Connect Timeout=30";
         }
     }
 }
