@@ -77,10 +77,10 @@ namespace Wafek_Web_Manager.Pages
                     var settings = System.Text.Json.JsonSerializer.Deserialize<dynamic>(json);
 
                     // استرجاع القيم لملء النموذج (لا تستبدل ما جاء من Environment Variables)
-                    if (string.IsNullOrEmpty(envServer) && settings.TryGetProperty("DbServer", out System.Text.Json.JsonElement ds)) DbServer = ds.GetString() ?? DbServer;
-                    if (string.IsNullOrEmpty(envDb)     && settings.TryGetProperty("DbName",   out System.Text.Json.JsonElement dn)) DbName   = dn.GetString() ?? DbName;
-                    if (string.IsNullOrEmpty(envUser)   && settings.TryGetProperty("DbUser",   out System.Text.Json.JsonElement du)) DbUser   = du.GetString() ?? DbUser;
-                    if (string.IsNullOrEmpty(envPass)   && settings.TryGetProperty("DbPassword", out System.Text.Json.JsonElement dp)) DbPassword = dp.GetString() ?? DbPassword;
+                    if (string.IsNullOrEmpty(envServer)) { if (settings.TryGetProperty("DbServer",   out System.Text.Json.JsonElement ds)) DbServer   = ds.GetString() ?? DbServer; }
+                    if (string.IsNullOrEmpty(envDb))     { if (settings.TryGetProperty("DbName",     out System.Text.Json.JsonElement dn)) DbName     = dn.GetString() ?? DbName; }
+                    if (string.IsNullOrEmpty(envUser))   { if (settings.TryGetProperty("DbUser",     out System.Text.Json.JsonElement du)) DbUser     = du.GetString() ?? DbUser; }
+                    if (string.IsNullOrEmpty(envPass))   { if (settings.TryGetProperty("DbPassword", out System.Text.Json.JsonElement dp)) DbPassword = dp.GetString() ?? DbPassword; }
 
                     // استرجاع إعدادات الإيميل أيضاً
                     if (settings.TryGetProperty("SmtpServer", out System.Text.Json.JsonElement smtp)) SmtpServer = smtp.GetString();
