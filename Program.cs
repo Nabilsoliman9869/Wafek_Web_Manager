@@ -8,6 +8,15 @@ var builder = WebApplication.CreateBuilder(args);
 
 static string GetWafekConnectionString(IConfiguration config)
 {
+    // 1) Environment Variables (highest priority)
+    var envServer = Environment.GetEnvironmentVariable("DbServer");
+    var envDb     = Environment.GetEnvironmentVariable("DbName");
+    var envUser   = Environment.GetEnvironmentVariable("DbUser");
+    var envPass   = Environment.GetEnvironmentVariable("DbPassword");
+    if (!string.IsNullOrEmpty(envServer) && !string.IsNullOrEmpty(envUser))
+        return $"Server={envServer};Database={envDb};User Id={envUser};Password={envPass};TrustServerCertificate=True;Encrypt=False;";
+
+    // 2) appsettings.custom.json
     var customPath = Wafek_Web_Manager.ConfigHelper.GetConfigFilePath();
     if (File.Exists(customPath))
     {
@@ -25,6 +34,8 @@ static string GetWafekConnectionString(IConfiguration config)
         }
         catch { }
     }
+
+    // 3) appsettings.json fallback
     return config.GetConnectionString("WafekDb") ?? "";
 }
 
