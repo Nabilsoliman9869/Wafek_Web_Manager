@@ -1,6 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
-using Microsoft.Data.SqlClient;
+using System.Data.SqlClient;
 using MailKit;
 using MailKit.Net.Imap;
 using MailKit.Net.Smtp;
