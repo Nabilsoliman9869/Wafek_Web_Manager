@@ -11,11 +11,13 @@ WORKDIR /app
 
 COPY --from=build /app/publish .
 COPY --from=build /src/SQL ./SQL
-COPY openssl-legacy.cnf .
-COPY render-entrypoint.sh .
-RUN chmod +x render-entrypoint.sh
+# Copy openssl config for legacy server support
+COPY openssl-legacy.cnf /etc/ssl/openssl-legacy.cnf
 
 EXPOSE 8080
 ENV ASPNETCORE_URLS=http://+:8080
-ENV OPENSSL_CONF=/app/openssl-legacy.cnf
-ENTRYPOINT ["./render-entrypoint.sh"]
+
+# Configure OpenSSL to allow legacy connections (TLS 1.0/1.1)
+ENV OPENSSL_CONF=/etc/ssl/openssl-legacy.cnf
+
+ENTRYPOINT ["dotnet", "Wafek_Web_Manager.dll"]

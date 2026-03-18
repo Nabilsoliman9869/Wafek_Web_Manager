@@ -3,11 +3,9 @@ openssl_conf = openssl_init
 [openssl_init]
 ssl_conf = ssl_sect
 
-[ssl_sect]
+[ssl_conf]
 system_default = system_default_sect
 
 [system_default_sect]
-# السماح بتوافق TLS قديم لبعض خوادم SQL القديمة
-MinProtocol = TLSv1
-CipherString = DEFAULT:@SECLEVEL=1
-
+CipherString = DEFAULT:@SECLEVEL=0
+MinProtocol = TLSv1.0
