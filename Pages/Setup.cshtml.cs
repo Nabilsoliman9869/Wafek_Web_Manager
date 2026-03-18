@@ -322,7 +322,7 @@ namespace Wafek_Web_Manager.Pages
                 UserID = DbUser,
                 Password = DbPassword,
                 TrustServerCertificate = true,
-                Encrypt = true, // Force Encrypt=true with TrustServerCertificate=true
+                Encrypt = false, // Must be false to completely avoid Error 35 on some older SQL versions
                 ConnectTimeout = 30
             };
             return builder.ConnectionString;
