@@ -57,6 +57,17 @@ namespace Wafek_Web_Manager.Pages
 
         public void OnGet()
         {
+            // 1) Environment Variables (highest priority)
+            var envServer = Environment.GetEnvironmentVariable("DbServer");
+            var envDb     = Environment.GetEnvironmentVariable("DbName");
+            var envUser   = Environment.GetEnvironmentVariable("DbUser");
+            var envPass   = Environment.GetEnvironmentVariable("DbPassword");
+            if (!string.IsNullOrEmpty(envServer)) DbServer = envServer;
+            if (!string.IsNullOrEmpty(envDb))     DbName   = envDb;
+            if (!string.IsNullOrEmpty(envUser))   DbUser   = envUser;
+            if (!string.IsNullOrEmpty(envPass))   DbPassword = envPass;
+
+            // 2) appsettings.custom.json (only fills remaining empty fields)
             var configPath = ConfigHelper.GetConfigFilePath();
             if (System.IO.File.Exists(configPath))
             {
@@ -65,11 +76,11 @@ namespace Wafek_Web_Manager.Pages
                     var json = System.IO.File.ReadAllText(configPath);
                     var settings = System.Text.Json.JsonSerializer.Deserialize<dynamic>(json);
 
-                    // استرجاع القيم لملء النموذج
-                    DbServer = settings.GetProperty("DbServer").GetString();
-                    DbName = settings.GetProperty("DbName").GetString();
-                    DbUser = settings.GetProperty("DbUser").GetString();
-                    DbPassword = settings.GetProperty("DbPassword").GetString();
+                    // استرجاع القيم لملء النموذج (لا تستبدل ما جاء من Environment Variables)
+                    if (string.IsNullOrEmpty(envServer) && settings.TryGetProperty("DbServer", out System.Text.Json.JsonElement ds)) DbServer = ds.GetString() ?? DbServer;
+                    if (string.IsNullOrEmpty(envDb)     && settings.TryGetProperty("DbName",   out System.Text.Json.JsonElement dn)) DbName   = dn.GetString() ?? DbName;
+                    if (string.IsNullOrEmpty(envUser)   && settings.TryGetProperty("DbUser",   out System.Text.Json.JsonElement du)) DbUser   = du.GetString() ?? DbUser;
+                    if (string.IsNullOrEmpty(envPass)   && settings.TryGetProperty("DbPassword", out System.Text.Json.JsonElement dp)) DbPassword = dp.GetString() ?? DbPassword;
 
                     // استرجاع إعدادات الإيميل أيضاً
                     if (settings.TryGetProperty("SmtpServer", out System.Text.Json.JsonElement smtp)) SmtpServer = smtp.GetString();
@@ -315,7 +326,11 @@ namespace Wafek_Web_Manager.Pages
 
         private string BuildConnectionString()
         {
-            return $"Server={DbServer};Database={DbName};User Id={DbUser};Password={DbPassword};TrustServerCertificate=True;Encrypt=False;Connect Timeout=30";
+            var server = !string.IsNullOrEmpty(DbServer) ? DbServer : Environment.GetEnvironmentVariable("DbServer");
+            var db     = !string.IsNullOrEmpty(DbName)   ? DbName   : Environment.GetEnvironmentVariable("DbName");
+            var user   = !string.IsNullOrEmpty(DbUser)   ? DbUser   : Environment.GetEnvironmentVariable("DbUser");
+            var pass   = !string.IsNullOrEmpty(DbPassword) ? DbPassword : Environment.GetEnvironmentVariable("DbPassword");
+            return $"Server={server};Database={db};User Id={user};Password={pass};TrustServerCertificate=True;Encrypt=False;Connect Timeout=30";
         }
     }
 }
