@@ -141,11 +141,7 @@ GO
 -- =============================================
 
 -- 6. Approve_CreateFirstProcess (The Trigger Engine - FLEXIBLE)
-IF EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[Approve_CreateFirstProcess]') AND type in (N'P', N'PC'))
-DROP PROCEDURE [dbo].[Approve_CreateFirstProcess]
-GO
-
-CREATE PROCEDURE [dbo].[Approve_CreateFirstProcess]
+CREATE OR ALTER PROCEDURE [dbo].[Approve_CreateFirstProcess]
 	@Param1 nvarchar(50),  -- Could be TableName OR GUID as String
 	@Param2 nvarchar(50) = NULL, -- Could be GUID OR Event
 	@Param3 nvarchar(50) = NULL  -- Could be Event OR NULL
@@ -213,11 +209,7 @@ END
 GO
 
 -- 7. Approve_ExecuteStep
-IF EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[Approve_ExecuteStep]') AND type in (N'P', N'PC'))
-DROP PROCEDURE [dbo].[Approve_ExecuteStep]
-GO
-
-CREATE PROCEDURE [dbo].[Approve_ExecuteStep]
+CREATE OR ALTER PROCEDURE [dbo].[Approve_ExecuteStep]
 	@WF_Id int,
 	@SourceID uniqueidentifier,
 	@StepOrder int

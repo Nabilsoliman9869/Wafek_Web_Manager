@@ -125,18 +125,17 @@ namespace Wafek_Web_Manager.Pages
             try
             {
                 string script = System.IO.File.ReadAllText(scriptPath);
-                string[] commands = Regex.Split(script, @"^\s*GO\s*$", RegexOptions.Multiline | RegexOptions.IgnoreCase);
 
                 using (var cnn = new SqlConnection(cs))
                 {
                     cnn.Open();
-                    foreach (string command in commands)
+                    // Execute SQL script intelligently by splitting on 'GO'
+                    var batches = script.Split(new[] { "\r\nGO", "\nGO", "\r\nGO\r\n", "\nGO\n", "GO\r\n", "GO\n" }, StringSplitOptions.RemoveEmptyEntries);
+                    foreach (var batch in batches)
                     {
-                        if (string.IsNullOrWhiteSpace(command)) continue;
-                        using (var cmd = new SqlCommand(command, cnn))
-                        {
-                            cmd.ExecuteNonQuery();
-                        }
+                        if (string.IsNullOrWhiteSpace(batch)) continue;
+                        using var cmd = new SqlCommand(batch, cnn);
+                        cmd.ExecuteNonQuery();
                     }
                 }
                 Message = "System Initialized Successfully! 🚀 Tables created.";
@@ -323,7 +322,7 @@ namespace Wafek_Web_Manager.Pages
                 UserID = DbUser,
                 Password = DbPassword,
                 TrustServerCertificate = true,
-                Encrypt = false,
+                Encrypt = true, // Force Encrypt=true with TrustServerCertificate=true
                 ConnectTimeout = 30
             };
             return builder.ConnectionString;
