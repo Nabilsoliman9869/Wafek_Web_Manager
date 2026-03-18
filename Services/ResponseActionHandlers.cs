@@ -1,5 +1,5 @@
 using System.Linq;
-using System.Data.SqlClient;
+using Microsoft.Data.SqlClient;
 
 namespace Wafek_Web_Manager.Services
 {
