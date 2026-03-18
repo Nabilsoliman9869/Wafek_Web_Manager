@@ -11,9 +11,11 @@ WORKDIR /app
 
 COPY --from=build /app/publish .
 COPY --from=build /src/SQL ./SQL
+COPY openssl-legacy.cnf .
 COPY render-entrypoint.sh .
 RUN chmod +x render-entrypoint.sh
 
 EXPOSE 8080
 ENV ASPNETCORE_URLS=http://+:8080
+ENV OPENSSL_CONF=/app/openssl-legacy.cnf
 ENTRYPOINT ["./render-entrypoint.sh"]

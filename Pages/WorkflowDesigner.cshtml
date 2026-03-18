@@ -37,6 +37,7 @@ else
                         <div id="collapseFormat" class="accordion-collapse collapse" data-bs-parent="#accordionFormat">
                             <div class="accordion-body">
 <p class="small text-muted">استعلام SQL يُنفّذ عند إرسال ميل الموافقة. استخدم <code>@@CardGuide</code> أو <code>@@SourceId</code> أو <code>@@BondGuide</code>. النتيجة تُحوّل لجدول HTML كما في *9009. راجع SQL/EmailFormatQuery_Bond_TBL011.sql.</p>
+<p class="small text-muted">استعلام SQL يُنفّذ عند إرسال ميل الموافقة. استخدم <code>@@CardGuide</code> أو <code>@@SourceId</code> أو <code>@@BondGuide</code>. النتيجة تُحوّل لجدول HTML كما في *9009. راجع SQL/EmailFormatQuery_Bond_TBL011.sql.</p>
                                     <form method="post" asp-page-handler="SaveFormatQuery">
                                     <input type="hidden" name="WorkflowId" value="@Model.SelectedWorkflow.Id"/>
                                     <textarea name="EmailFormatQuery" class="form-control font-monospace small" rows="8" placeholder="SELECT ... FROM TBL012 ... WHERE MainGuide IN (SELECT CardGuide FROM TBL010 WHERE CardGuide = @@CardGuide)">@(Model.SelectedWorkflow.EmailFormatQuery ?? "")</textarea>

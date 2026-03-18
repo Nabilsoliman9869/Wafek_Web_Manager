@@ -24,9 +24,8 @@ namespace Wafek_Web_Manager.Services
         {
             try
             {
-                var configPath = ConfigHelper.GetConfigFilePath();
-                if (!System.IO.File.Exists(configPath)) return false;
-                var json = System.IO.File.ReadAllText(configPath);
+                if (!System.IO.File.Exists("appsettings.custom.json")) return false;
+                var json = System.IO.File.ReadAllText("appsettings.custom.json");
                 var s = JsonSerializer.Deserialize<JsonElement>(json);
                 return s.TryGetProperty("ImapEnabled", out var ie) && ie.GetBoolean();
             }
@@ -37,9 +36,8 @@ namespace Wafek_Web_Manager.Services
         {
             try
             {
-                var configPath = ConfigHelper.GetConfigFilePath();
-                if (!System.IO.File.Exists(configPath)) return (null, 993, SecureSocketOptions.SslOnConnect, null, null);
-                var json = System.IO.File.ReadAllText(configPath);
+                if (!System.IO.File.Exists("appsettings.custom.json")) return (null, 993, SecureSocketOptions.SslOnConnect, null, null);
+                var json = System.IO.File.ReadAllText("appsettings.custom.json");
                 var s = JsonSerializer.Deserialize<JsonElement>(json);
                 var host = s.TryGetProperty("ImapServer", out var h) ? h.GetString() : null;
                 var port = s.TryGetProperty("ImapPort", out var p) ? p.GetInt32() : 993;
