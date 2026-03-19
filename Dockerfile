@@ -11,13 +11,15 @@ WORKDIR /app
 
 COPY --from=build /app/publish .
 COPY --from=build /src/SQL ./SQL
-# Copy openssl config for legacy server support
-COPY openssl-legacy.cnf /etc/ssl/openssl-legacy.cnf
+
+# Patch system OpenSSL to allow TLS 1.0/1.1 for legacy SQL Server compatibility
+RUN sed -i 's/MinProtocol = TLSv1.2/MinProtocol = TLSv1/' /etc/ssl/openssl.cnf || true && \
+    sed -i 's/CipherString = DEFAULT@SECLEVEL=2/CipherString = DEFAULT@SECLEVEL=0/' /etc/ssl/openssl.cnf || true && \
+    echo "[ legacy_sect ]" >> /etc/ssl/openssl.cnf && \
+    echo "MinProtocol = TLSv1" >> /etc/ssl/openssl.cnf && \
+    echo "CipherString = DEFAULT:@SECLEVEL=0" >> /etc/ssl/openssl.cnf
 
 EXPOSE 8080
 ENV ASPNETCORE_URLS=http://+:8080
-
-# Configure OpenSSL to allow legacy connections (TLS 1.0/1.1)
-ENV OPENSSL_CONF=/etc/ssl/openssl-legacy.cnf
 
 ENTRYPOINT ["dotnet", "Wafek_Web_Manager.dll"]
