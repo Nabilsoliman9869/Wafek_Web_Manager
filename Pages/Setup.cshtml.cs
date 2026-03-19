@@ -59,13 +59,13 @@ namespace Wafek_Web_Manager.Pages
         {
             // 1) Environment Variables (highest priority)
             var envServer = Environment.GetEnvironmentVariable("DbServer");
-            var envDb     = Environment.GetEnvironmentVariable("DbName");
-            var envUser   = Environment.GetEnvironmentVariable("DbUser");
-            var envPass   = Environment.GetEnvironmentVariable("DbPassword");
+            var envDb = Environment.GetEnvironmentVariable("DbName");
+            var envUser = Environment.GetEnvironmentVariable("DbUser");
+            var envPass = Environment.GetEnvironmentVariable("DbPassword");
             if (!string.IsNullOrEmpty(envServer)) DbServer = envServer;
-            if (!string.IsNullOrEmpty(envDb))     DbName   = envDb;
-            if (!string.IsNullOrEmpty(envUser))   DbUser   = envUser;
-            if (!string.IsNullOrEmpty(envPass))   DbPassword = envPass;
+            if (!string.IsNullOrEmpty(envDb)) DbName = envDb;
+            if (!string.IsNullOrEmpty(envUser)) DbUser = envUser;
+            if (!string.IsNullOrEmpty(envPass)) DbPassword = envPass;
 
             // 2) appsettings.custom.json (only fills remaining empty fields)
             var configPath = ConfigHelper.GetConfigFilePath();
@@ -77,10 +77,10 @@ namespace Wafek_Web_Manager.Pages
                     var settings = System.Text.Json.JsonSerializer.Deserialize<dynamic>(json);
 
                     // استرجاع القيم لملء النموذج (لا تستبدل ما جاء من Environment Variables)
-                    if (string.IsNullOrEmpty(envServer)) { if (settings.TryGetProperty("DbServer",   out System.Text.Json.JsonElement ds)) DbServer   = ds.GetString() ?? DbServer; }
-                    if (string.IsNullOrEmpty(envDb))     { if (settings.TryGetProperty("DbName",     out System.Text.Json.JsonElement dn)) DbName     = dn.GetString() ?? DbName; }
-                    if (string.IsNullOrEmpty(envUser))   { if (settings.TryGetProperty("DbUser",     out System.Text.Json.JsonElement du)) DbUser     = du.GetString() ?? DbUser; }
-                    if (string.IsNullOrEmpty(envPass))   { if (settings.TryGetProperty("DbPassword", out System.Text.Json.JsonElement dp)) DbPassword = dp.GetString() ?? DbPassword; }
+                    if (string.IsNullOrEmpty(envServer)) { if (settings.TryGetProperty("DbServer", out System.Text.Json.JsonElement ds)) DbServer = ds.GetString() ?? DbServer; }
+                    if (string.IsNullOrEmpty(envDb)) { if (settings.TryGetProperty("DbName", out System.Text.Json.JsonElement dn)) DbName = dn.GetString() ?? DbName; }
+                    if (string.IsNullOrEmpty(envUser)) { if (settings.TryGetProperty("DbUser", out System.Text.Json.JsonElement du)) DbUser = du.GetString() ?? DbUser; }
+                    if (string.IsNullOrEmpty(envPass)) { if (settings.TryGetProperty("DbPassword", out System.Text.Json.JsonElement dp)) DbPassword = dp.GetString() ?? DbPassword; }
 
                     // استرجاع إعدادات الإيميل أيضاً
                     if (settings.TryGetProperty("SmtpServer", out System.Text.Json.JsonElement smtp)) SmtpServer = smtp.GetString();
@@ -224,6 +224,9 @@ namespace Wafek_Web_Manager.Pages
                 };
 
                 using var client = new MailKit.Net.Smtp.SmtpClient();
+                // Override default certificate validation to ignore invalid certs
+                client.ServerCertificateValidationCallback = (s, c, h, e) => true;
+
                 var secureSocketOptions = EnableSsl && SmtpPort == 587
                     ? SecureSocketOptions.StartTls
                     : (EnableSsl ? SecureSocketOptions.SslOnConnect : SecureSocketOptions.None);
@@ -327,9 +330,9 @@ namespace Wafek_Web_Manager.Pages
         private string BuildConnectionString()
         {
             var server = !string.IsNullOrEmpty(DbServer) ? DbServer : Environment.GetEnvironmentVariable("DbServer");
-            var db     = !string.IsNullOrEmpty(DbName)   ? DbName   : Environment.GetEnvironmentVariable("DbName");
-            var user   = !string.IsNullOrEmpty(DbUser)   ? DbUser   : Environment.GetEnvironmentVariable("DbUser");
-            var pass   = !string.IsNullOrEmpty(DbPassword) ? DbPassword : Environment.GetEnvironmentVariable("DbPassword");
+            var db = !string.IsNullOrEmpty(DbName) ? DbName : Environment.GetEnvironmentVariable("DbName");
+            var user = !string.IsNullOrEmpty(DbUser) ? DbUser : Environment.GetEnvironmentVariable("DbUser");
+            var pass = !string.IsNullOrEmpty(DbPassword) ? DbPassword : Environment.GetEnvironmentVariable("DbPassword");
             return $"Server={server};Database={db};User Id={user};Password={pass};TrustServerCertificate=True;Encrypt=False;Connect Timeout=30";
         }
     }

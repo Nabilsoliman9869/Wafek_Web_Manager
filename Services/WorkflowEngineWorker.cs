@@ -225,6 +225,9 @@ namespace Wafek_Web_Manager.Services
                 message.Body = bodyBuilder.ToMessageBody();
 
                 using var client = new MailKit.Net.Smtp.SmtpClient();
+                // Override default certificate validation to ignore invalid certs (like we did for SQL)
+                client.ServerCertificateValidationCallback = (s, c, h, e) => true;
+                
                 var secureOptions = _smtpPort == 587 ? SecureSocketOptions.StartTls : SecureSocketOptions.SslOnConnect;
                 client.Connect(_smtpServer, _smtpPort, secureOptions);
                 client.Authenticate(_senderEmail, _senderPassword);

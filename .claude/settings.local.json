@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(for f:*)",
+      "Bash(do)",
+      "Bash(sed -i 's/using System\\\\.Data\\\\.SqlClient;/using Microsoft.Data.SqlClient;/g' \"$f\")",
+      "Bash(echo \"Fixed: $f\")",
+      "Bash(done)",
+      "Bash(dotnet build:*)",
+      "Bash(cd:*)"
+    ]
+  }
+}

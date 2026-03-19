@@ -20,6 +20,7 @@ BEGIN
     SET NOCOUNT ON;
     
     DECLARE @CardGuide uniqueidentifier
+    DECLARE @GuidStr nvarchar(50)
     
     DECLARE c CURSOR FOR SELECT CardGuide FROM inserted
     OPEN c
@@ -27,10 +28,14 @@ BEGIN
     
     WHILE @@FETCH_STATUS = 0
     BEGIN
+        -- Convert GUID to string before passing to EXEC
+        SET @GuidStr = CAST(@CardGuide AS nvarchar(50))
+        
         EXEC Approve_CreateFirstProcess 
             @Param1 = 'TBL010', 
-            @Param2 = CAST(@CardGuide AS nvarchar(50)), 
+            @Param2 = @GuidStr, 
             @Param3 = 'OnAfterInsert'
+            
         FETCH NEXT FROM c INTO @CardGuide
     END
     
