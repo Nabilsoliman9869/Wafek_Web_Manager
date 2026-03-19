@@ -78,8 +78,8 @@ namespace Wafek_Web_Manager.Services
                 var envEmail = Environment.GetEnvironmentVariable("SenderEmail");
                 if (!string.IsNullOrWhiteSpace(envEmail)) _senderEmail = envEmail.Trim();
                 
-                var envPass = Environment.GetEnvironmentVariable("SenderPassword");
-                if (!string.IsNullOrWhiteSpace(envPass)) _senderPassword = envPass.Replace(" ", "").Trim();
+                var envPass2 = Environment.GetEnvironmentVariable("SenderPassword");
+                if (!string.IsNullOrWhiteSpace(envPass2)) _senderPassword = envPass2.Replace(" ", "").Trim();
 
                 var envUrl = Environment.GetEnvironmentVariable("APPROVE_BASE_URL");
                 if (!string.IsNullOrWhiteSpace(envUrl)) _approveBaseUrl = envUrl.Trim();
