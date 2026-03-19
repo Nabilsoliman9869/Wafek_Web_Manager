@@ -237,13 +237,21 @@ namespace Wafek_Web_Manager.Services
                 message.Body = bodyBuilder.ToMessageBody();
 
                 using var client = new MailKit.Net.Smtp.SmtpClient();
-                // Override default certificate validation to ignore invalid certs (like we did for SQL)
+                // Enable verbose logging to console to see exactly what SMTP server says
                 client.ServerCertificateValidationCallback = (s, c, h, e) => true;
                 
                 var secureOptions = _smtpPort == 587 ? SecureSocketOptions.StartTls : SecureSocketOptions.SslOnConnect;
+                
+                _logger.LogInformation($"Attempting SMTP Connect to {_smtpServer}:{_smtpPort}...");
                 client.Connect(_smtpServer, _smtpPort, secureOptions);
+                
+                _logger.LogInformation($"Attempting SMTP Auth for {_senderEmail}...");
                 client.Authenticate(_senderEmail, _senderPassword);
+                
+                _logger.LogInformation($"Attempting SMTP Send to {recipientEmail}...");
                 client.Send(message);
+                
+                _logger.LogInformation($"SMTP Send Complete. Disconnecting...");
                 client.Disconnect(true);
 
                 UpdateLogStatus(logId, "WaitingForResponse", $"Email sent to {recipientEmail}");
@@ -252,7 +260,9 @@ namespace Wafek_Web_Manager.Services
             catch (Exception ex)
             {
                 _logger.LogError(ex, $"Failed to send email for LogId {logId}");
-                UpdateLogStatus(logId, "Error", "Email failed: " + ex.Message + " (Inner: " + (ex.InnerException?.Message ?? "None") + ")");
+                string errorMsg = ex.Message;
+                if (ex.InnerException != null) errorMsg += " | Inner: " + ex.InnerException.Message;
+                UpdateLogStatus(logId, "Error", "Email failed: " + errorMsg);
             }
         }
 
