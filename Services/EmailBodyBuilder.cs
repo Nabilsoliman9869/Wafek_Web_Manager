@@ -699,10 +699,14 @@ WHERE h.BondGuide = @id", conn);
             var notes = d.Notes ?? "";
             var logoUrl = GetLogoFallbackUrl();
 
-            var summaryBlock = $@"<p style=""background:#f1f1f1;text-align:right;margin:10px;direction:rtl"">إلى السيد: <b>{recipientName}</b><br/>نوع البطاقة: <b>{cardName}</b> | رقمها: <b>{cardNum}</b><br/>تاريخ إرسال الطلب: <b>{sendDate}</b><br/>المرسل: <b>{sender}</b><br/>شركة: <b>{company}</b><br/>هاتف: <b>{phone}</b></p><p style=""color:#128ab5;text-align:right;margin:10px;background:#f1f1f1"">ملاحظات: <b>{notes}</b></p>";
+            var summaryBlock = $@"<p style=""background:#f1f1f1;text-align:right;margin:10px;direction:rtl"">إلى السيد: <b>{recipientName}</b><br/>نوع البطاقة: <b>{cardName}</b> | رقمها: <b>{cardNum}</b><br/>تاريخ إرسال الطلب: <b>{sendDate}</b><br/>المرسل: <b>{sender}</b><br/>الشركة: <b>{company}</b><br/>الهاتف: <b dir=""ltr"">{phone}</b></p>";
+            if (!string.IsNullOrWhiteSpace(notes))
+                summaryBlock += $@"<div style=""background:#fff9c4;padding:10px;margin:10px;border-right:4px solid #fbc02d;text-align:right;direction:rtl""><b>ملاحظات:</b> {notes}</div>";
+
             var docBlock = string.IsNullOrWhiteSpace(documentBlock) ? "" : $@"<div style=""margin:16px 0;padding:12px;background:#fff;border:1px solid #ddd;overflow-x:auto"">{documentBlock}</div>";
             var sep = approveLink?.Contains("?") == true ? "&" : "?";
             var replyInstruction = $@"<p style=""font-size:13px;font-weight:bold;margin-top:16px;text-align:center;background:#e8f5e9;padding:12px;border-radius:8px"">للرد: <b>أعد الإرسال (Reply)</b> واكتب <code>#1#</code> موافق | <code>#2#</code> مرفوض | <code>#3#</code> يؤجل</p>";
+            
             var linkBlock = string.IsNullOrEmpty(approveLink)
                 ? replyInstruction
                 : $@"<p style=""font-size:14px;font-weight:bold;margin-top:20px;text-align:center"">اضغط للرد مباشرة:</p>
@@ -714,14 +718,14 @@ WHERE h.BondGuide = @id", conn);
 {replyInstruction}
 <p style=""font-size:11px;text-align:center;color:#666"">أو أعد الإرسال واكتب #1# أو #2# أو #3#</p>";
 
-            return $@"<!DOCTYPE html><html lang=""ar"" dir=""rtl""><head><meta charset=""UTF-8""/><meta name=""viewport"" content=""width=device-width,initial-scale=1""/><title>نظام وافق | طلب موافقة</title></head><body style=""margin:0;padding:0;background:#e8e8e8;font-family:Arial,sans-serif"">
+            return $@"<!DOCTYPE html><html lang=""ar"" dir=""rtl""><head><meta charset=""UTF-8""/><meta name=""viewport"" content=""width=device-width,initial-scale=1""/><title>TelleWork System | طلب موافقة</title></head><body style=""margin:0;padding:0;background:#e8e8e8;font-family:Arial,sans-serif;color:#333"">
 <table role=""presentation"" cellpadding=""0"" cellspacing=""0"" width=""100%"" style=""background:#e8e8e8;padding:20px 0""><tr><td align=""center"">
 <table role=""presentation"" cellpadding=""0"" cellspacing=""0"" width=""600"" style=""max-width:100%;background:#f1f1f1;border-radius:20px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.08);border:8px solid {ThemeColor};margin:10px;text-align:center;max-width:500px;margin-left:auto;margin-right:auto"">
 <tr><td style=""padding:0"">
 {(string.IsNullOrEmpty(logoUrl) ? "" : $@"<img src=""{logoUrl}"" width=""280"" height=""80"" style=""max-width:280px;height:auto;margin:15px auto;display:block"" alt="""" />")}
 </td></tr>
 <tr><td style=""padding:20px"">
-<h1 style=""font-weight:bold;margin:5px;font-size:25px;background:#f1f1f1"">طلب موافقة | <span style=""color:{ThemeColor}"">نظام وافق</span></h1>
+<h1 style=""font-weight:bold;margin:5px;font-size:25px;background:#f1f1f1"">طلب موافقة | <span style=""color:{ThemeColor}"">TelleWork System</span></h1>
 {summaryBlock}
 {docBlock}
 {linkBlock}
@@ -766,29 +770,33 @@ WHERE h.BondGuide = @id", conn);
             var notes = d.Notes ?? "";
             var logoUrl = GetLogoFallbackUrl();
 
-            var summaryBlock = $@"<p style=""background:#f1f1f1;text-align:left;margin:10px"">To Mr: <b>{recipientName}</b><br/>Card Type: <b>{cardName}</b> | Card Number: <b>{cardNum}</b><br/>Request Send Date: <b>{sendDate}</b><br/>Sender: <b>{sender}</b><br/>Company: <b>{company}</b><br/>Phone: <b>{phone}</b></p><p style=""color:#128ab5;text-align:left;margin:10px;background:#f1f1f1"">Notes: <b>{notes}</b></p>";
+            var summaryBlock = $@"<p style=""background:#f1f1f1;text-align:left;margin:10px"">To Mr: <b>{recipientName}</b><br/>Card Type: <b>{cardName}</b> | Card Number: <b>{cardNum}</b><br/>Request Send Date: <b>{sendDate}</b><br/>Sender: <b>{sender}</b><br/>Company: <b>{company}</b><br/>Phone: <b>{phone}</b></p>";
+            if (!string.IsNullOrWhiteSpace(notes))
+                summaryBlock += $@"<div style=""background:#fff9c4;padding:10px;margin:10px;border-left:4px solid #fbc02d;text-align:left""><b>Notes:</b> {notes}</div>";
+
             var docBlock = string.IsNullOrWhiteSpace(documentBlock) ? "" : $@"<div style=""margin:16px 0;padding:12px;background:#fff;border:1px solid #ddd;overflow-x:auto"">{documentBlock}</div>";
-            var linkSep = approveLink?.Contains("?") == true ? "&" : "?";
-            var replyInstructionEn = $@"<p style=""font-size:13px;font-weight:bold;margin-top:16px;text-align:center;background:#e8f5e9;padding:12px;border-radius:8px"">To reply: <b>Reply</b> and type <code>#1#</code> Approved | <code>#2#</code> Rejected | <code>#3#</code> Postponed</p>";
+            var sep = approveLink?.Contains("?") == true ? "&" : "?";
+            var replyInstruction = $@"<p style=""font-size:13px;font-weight:bold;margin-top:16px;text-align:center;background:#e8f5e9;padding:12px;border-radius:8px"">To reply: <b>Reply to this email</b> and type <code>#1#</code> Approved | <code>#2#</code> Rejected | <code>#3#</code> Postponed</p>";
+            
             var linkBlock = string.IsNullOrEmpty(approveLink)
-                ? replyInstructionEn
-                : $@"<p style=""font-size:14px;font-weight:bold;margin-top:20px;text-align:center"">Click to reply:</p>
+                ? replyInstruction
+                : $@"<p style=""font-size:14px;font-weight:bold;margin-top:20px;text-align:center"">Click to reply directly:</p>
 <table role=""presentation"" cellpadding=""0"" cellspacing=""10"" align=""center"" style=""margin:16px auto""><tr>
-<td><a href=""{approveLink}{linkSep}action=Approved"" style=""display:inline-block;padding:14px 24px;background:#22c55e;color:#fff!important;font-weight:bold;font-size:15px;text-decoration:none;border-radius:10px"" target=""_blank"">✓ Approved</a></td>
-<td><a href=""{approveLink}{linkSep}action=Rejected"" style=""display:inline-block;padding:14px 24px;background:#ef4444;color:#fff!important;font-weight:bold;font-size:15px;text-decoration:none;border-radius:10px"" target=""_blank"">✗ Rejected</a></td>
-<td><a href=""{approveLink}{linkSep}action=Postponed"" style=""display:inline-block;padding:14px 24px;background:#f59e0b;color:#fff!important;font-weight:bold;font-size:15px;text-decoration:none;border-radius:10px"" target=""_blank"">⏳ Postponed</a></td>
+<td><a href=""{approveLink}{sep}action=Approved"" style=""display:inline-block;padding:14px 24px;background:#22c55e;color:#fff!important;font-weight:bold;font-size:15px;text-decoration:none;border-radius:10px"" target=""_blank"">✓ Approved</a></td>
+<td><a href=""{approveLink}{sep}action=Rejected"" style=""display:inline-block;padding:14px 24px;background:#ef4444;color:#fff!important;font-weight:bold;font-size:15px;text-decoration:none;border-radius:10px"" target=""_blank"">✗ Rejected</a></td>
+<td><a href=""{approveLink}{sep}action=Postponed"" style=""display:inline-block;padding:14px 24px;background:#f59e0b;color:#fff!important;font-weight:bold;font-size:15px;text-decoration:none;border-radius:10px"" target=""_blank"">⏳ Postponed</a></td>
 </tr></table>
-{replyInstructionEn}
+{replyInstruction}
 <p style=""font-size:11px;text-align:center;color:#666"">Or reply and type #1# or #2# or #3#</p>";
 
-            return $@"<!DOCTYPE html><html lang=""en"" dir=""ltr""><head><meta charset=""UTF-8""/><meta name=""viewport"" content=""width=device-width,initial-scale=1""/><title>Wafek System | Approval Request</title></head><body style=""margin:0;padding:0;background:#e8e8e8;font-family:Arial,sans-serif"">
+            return $@"<!DOCTYPE html><html lang=""en"" dir=""ltr""><head><meta charset=""UTF-8""/><meta name=""viewport"" content=""width=device-width,initial-scale=1""/><title>TelleWork System | Approval Request</title></head><body style=""margin:0;padding:0;background:#e8e8e8;font-family:Arial,sans-serif;color:#333"">
 <table role=""presentation"" cellpadding=""0"" cellspacing=""0"" width=""100%"" style=""background:#e8e8e8;padding:20px 0""><tr><td align=""center"">
 <table role=""presentation"" cellpadding=""0"" cellspacing=""0"" width=""600"" style=""max-width:100%;background:#f1f1f1;border-radius:20px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.08);border:8px solid {ThemeColor};margin:10px;text-align:center;max-width:500px;margin-left:auto;margin-right:auto"">
 <tr><td style=""padding:0"">
 {(string.IsNullOrEmpty(logoUrl) ? "" : $@"<img src=""{logoUrl}"" width=""280"" height=""80"" style=""max-width:280px;height:auto;margin:15px auto;display:block"" alt="""" />")}
 </td></tr>
 <tr><td style=""padding:20px"">
-<h1 style=""font-weight:bold;margin:5px;font-size:25px;background:#f1f1f1"">Request for Approval | <span style=""color:{ThemeColor}"">Wafek System</span></h1>
+<h1 style=""font-weight:bold;margin:5px;font-size:25px;background:#f1f1f1"">Request for Approval | <span style=""color:{ThemeColor}"">TelleWork System</span></h1>
 {summaryBlock}
 {docBlock}
 {linkBlock}
