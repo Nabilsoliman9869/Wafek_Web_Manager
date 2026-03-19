@@ -57,7 +57,7 @@ namespace Wafek_Web_Manager.Services
                 if (!string.IsNullOrWhiteSpace(envSmtp)) _smtpServer = envSmtp.Trim();
                 
                 var envPort = Environment.GetEnvironmentVariable("SmtpPort");
-                if (!string.IsNullOrWhiteSpace(envPort) && int.TryParse(envPort, out int p)) _smtpPort = p;
+                if (!string.IsNullOrWhiteSpace(envPort) && int.TryParse(envPort, out int ep)) _smtpPort = ep;
                 
                 var envEmail = Environment.GetEnvironmentVariable("SenderEmail");
                 if (!string.IsNullOrWhiteSpace(envEmail)) _senderEmail = envEmail.Trim();
