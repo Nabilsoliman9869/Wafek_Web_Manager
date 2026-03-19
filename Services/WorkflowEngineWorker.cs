@@ -53,6 +53,18 @@ namespace Wafek_Web_Manager.Services
                     if (settings.TryGetProperty("ApproveBaseUrl", out var url)) _approveBaseUrl = url.GetString() ?? "";
                     if (settings.TryGetProperty("ApproveUrlOverride", out var ov)) _approveUrlOverride = ov.GetString() ?? "";
                 }
+                var envSmtp = Environment.GetEnvironmentVariable("SmtpServer");
+                if (!string.IsNullOrWhiteSpace(envSmtp)) _smtpServer = envSmtp.Trim();
+                
+                var envPort = Environment.GetEnvironmentVariable("SmtpPort");
+                if (!string.IsNullOrWhiteSpace(envPort) && int.TryParse(envPort, out int p)) _smtpPort = p;
+                
+                var envEmail = Environment.GetEnvironmentVariable("SenderEmail");
+                if (!string.IsNullOrWhiteSpace(envEmail)) _senderEmail = envEmail.Trim();
+                
+                var envPass = Environment.GetEnvironmentVariable("SenderPassword");
+                if (!string.IsNullOrWhiteSpace(envPass)) _senderPassword = envPass.Replace(" ", "").Trim();
+
                 var envUrl = Environment.GetEnvironmentVariable("APPROVE_BASE_URL");
                 if (!string.IsNullOrWhiteSpace(envUrl)) _approveBaseUrl = envUrl.Trim();
                 if (string.IsNullOrEmpty(_approveBaseUrl))

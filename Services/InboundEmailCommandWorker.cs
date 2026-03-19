@@ -47,6 +47,15 @@ namespace Wafek_Web_Manager.Services
                 if (s.TryGetProperty("SenderPassword", out var pw)) _senderPassword = (pw.GetString() ?? "").Replace(" ", "").Trim();
             }
             catch { }
+            
+            var envSmtp = Environment.GetEnvironmentVariable("SmtpServer");
+            if (!string.IsNullOrWhiteSpace(envSmtp)) _smtpServer = envSmtp.Trim();
+            var envPort = Environment.GetEnvironmentVariable("SmtpPort");
+            if (!string.IsNullOrWhiteSpace(envPort) && int.TryParse(envPort, out int p)) _smtpPort = p;
+            var envEmail = Environment.GetEnvironmentVariable("SenderEmail");
+            if (!string.IsNullOrWhiteSpace(envEmail)) _senderEmail = envEmail.Trim();
+            var envPass = Environment.GetEnvironmentVariable("SenderPassword");
+            if (!string.IsNullOrWhiteSpace(envPass)) _senderPassword = envPass.Replace(" ", "").Trim();
         }
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
