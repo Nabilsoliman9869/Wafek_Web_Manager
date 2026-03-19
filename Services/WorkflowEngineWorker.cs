@@ -100,20 +100,25 @@ namespace Wafek_Web_Manager.Services
 
             while (!stoppingToken.IsCancellationRequested)
             {
-                if (string.IsNullOrEmpty(_connectionString))
-                {
-                    LoadSettings(); // Try to reload if failed
-                    await Task.Delay(10000, stoppingToken);
-                    continue;
-                }
-
                 try
                 {
+                    if (string.IsNullOrEmpty(_connectionString))
+                    {
+                        LoadSettings();
+                        if (string.IsNullOrEmpty(_connectionString))
+                        {
+                            _logger.LogWarning("Connection string is empty. Waiting for configuration...");
+                            await Task.Delay(10000, stoppingToken);
+                            continue;
+                        }
+                    }
+
+                    _logger.LogInformation($"Polling for pending workflow steps... Connection string starts with: {_connectionString.Substring(0, Math.Min(20, _connectionString.Length))}...");
                     await ProcessPendingSteps();
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError(ex, "Error processing workflow steps");
+                    _logger.LogError(ex, "Error occurred in Workflow Engine Worker.");
                 }
 
                 await Task.Delay(10000, stoppingToken); // Check every 10 seconds
@@ -122,9 +127,11 @@ namespace Wafek_Web_Manager.Services
 
         private async Task ProcessPendingSteps()
         {
+            _logger.LogInformation("Connecting to database to check for Pending steps...");
             using (var conn = new SqlConnection(_connectionString))
             {
                 await conn.OpenAsync();
+                _logger.LogInformation("Database connected successfully.");
 
                 // 1. Get Pending Steps (SendEmail) + StepCondition + EmailFormatQuery للتقييم قبل الإرسال
                 var sqlWithFormat = @"
@@ -140,25 +147,31 @@ namespace Wafek_Web_Manager.Services
                 {
                     using (var cmd = new SqlCommand(sqlWithFormat, conn))
                     using (var reader = await cmd.ExecuteReaderAsync())
-                    {
-                        while (await reader.ReadAsync())
                         {
-                            long logId = reader.GetInt64(0);
-                            Guid sourceId = reader.GetGuid(2);
-                            string selectedValue = reader.IsDBNull(5) ? "" : reader.GetString(5);
-                            string sourceTable = reader.GetString(6);
-                            string stepCondition = reader.IsDBNull(7) ? "" : reader.GetString(7);
-                            string? emailFormatQuery = reader.FieldCount > 8 && !reader.IsDBNull(8) ? reader.GetString(8) : null;
-
-                            if (!string.IsNullOrWhiteSpace(stepCondition) && !EvaluateStepCondition(conn, sourceTable, sourceId, stepCondition))
+                            bool found = false;
+                            while (await reader.ReadAsync())
                             {
-                                AdvanceOrFailStep(logId, reader.GetInt32(1), reader.GetInt32(3));
-                                continue;
-                            }
+                                found = true;
+                                long logId = reader.GetInt64(0);
+                                Guid sourceId = reader.GetGuid(2);
+                                string selectedValue = reader.IsDBNull(5) ? "" : reader.GetString(5);
+                                string sourceTable = reader.GetString(6);
+                                string stepCondition = reader.IsDBNull(7) ? "" : reader.GetString(7);
+                                string? emailFormatQuery = reader.FieldCount > 8 && !reader.IsDBNull(8) ? reader.GetString(8) : null;
 
-                            await SendEmailForStep(logId, sourceId, selectedValue, sourceTable, emailFormatQuery);
+                                _logger.LogInformation($"Found Pending Step: LogId={logId}, SourceTable={sourceTable}, ActionType=SendEmail");
+
+                                if (!string.IsNullOrWhiteSpace(stepCondition) && !EvaluateStepCondition(conn, sourceTable, sourceId, stepCondition))
+                                {
+                                    _logger.LogInformation($"Condition failed for LogId={logId}. Skipping...");
+                                    AdvanceOrFailStep(logId, reader.GetInt32(1), reader.GetInt32(3));
+                                    continue;
+                                }
+
+                                await SendEmailForStep(logId, sourceId, selectedValue, sourceTable, emailFormatQuery);
+                            }
+                            if (!found) _logger.LogInformation("No Pending SendEmail steps found.");
                         }
-                    }
                 }
                 catch (Microsoft.Data.SqlClient.SqlException)
                 {
