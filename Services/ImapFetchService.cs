@@ -5,7 +5,7 @@ using MailKit;
 using MailKit.Net.Imap;
 using MailKit.Search;
 using MailKit.Security;
-using Microsoft.Data.SqlClient;
+using System.Data.SqlClient;
 using MimeKit;
 
 namespace Wafek_Web_Manager.Services

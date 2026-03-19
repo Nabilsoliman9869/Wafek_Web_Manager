@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Data;
 using System.IO;
-using Microsoft.Data.SqlClient;
+using System.Data.SqlClient;
 
 namespace Wafek_Web_Manager.Services
 {
@@ -220,7 +220,7 @@ WHERE d.MainGuide = @id", conn);
             return data;
         }
 
-        static string? GetColVal(Microsoft.Data.SqlClient.SqlDataReader r, string col)
+        static string? GetColVal(SqlDataReader r, string col)
         {
             try
             {
@@ -231,7 +231,7 @@ WHERE d.MainGuide = @id", conn);
             catch { return null; }
         }
 
-        static bool TryGetDateTime(Microsoft.Data.SqlClient.SqlDataReader r, string col, out DateTime dt)
+        static bool TryGetDateTime(SqlDataReader r, string col, out DateTime dt)
         {
             dt = default;
             try
@@ -446,7 +446,7 @@ WHERE h.BondGuide = @id", conn);
             }
         }
 
-        static decimal GetDecimal(Microsoft.Data.SqlClient.SqlDataReader r, string col)
+        static decimal GetDecimal(SqlDataReader r, string col)
         {
             try
             {
@@ -458,7 +458,7 @@ WHERE h.BondGuide = @id", conn);
             catch { return 0; }
         }
 
-        static decimal GetDecimalByOrdinal(Microsoft.Data.SqlClient.SqlDataReader r, int i)
+        static decimal GetDecimalByOrdinal(SqlDataReader r, int i)
         {
             try
             {
