@@ -481,3 +481,112 @@ BEGIN
     END
 END
 GO
+
+-- =============================================
+-- WORKFLOW TRIGGERS (Integration with Source Tables)
+-- =============================================
+
+-- 11. Trigger for TBL010 (Bonds Transaction)
+IF EXISTS (SELECT * FROM sys.triggers WHERE name = 'trg_WF_TBL010_AfterInsert')
+    DROP TRIGGER [dbo].[trg_WF_TBL010_AfterInsert]
+GO
+
+CREATE TRIGGER [dbo].[trg_WF_TBL010_AfterInsert]
+ON [dbo].[TBL010]
+AFTER INSERT
+AS
+BEGIN
+    SET NOCOUNT ON;
+    
+    DECLARE @CardGuide uniqueidentifier
+    DECLARE @GuidStr nvarchar(50)
+    
+    DECLARE c CURSOR FOR SELECT CardGuide FROM inserted
+    OPEN c
+    FETCH NEXT FROM c INTO @CardGuide
+    
+    WHILE @@FETCH_STATUS = 0
+    BEGIN
+        SET @GuidStr = CAST(@CardGuide AS nvarchar(50))
+        EXEC Approve_CreateFirstProcess 
+            @Param1 = 'TBL010', 
+            @Param2 = @GuidStr, 
+            @Param3 = 'OnAfterInsert'
+            
+        FETCH NEXT FROM c INTO @CardGuide
+    END
+    
+    CLOSE c
+    DEALLOCATE c
+END
+GO
+
+-- 12. Trigger for TBL022 (Bills/Invoices)
+IF EXISTS (SELECT * FROM sys.triggers WHERE name = 'trg_WF_TBL022_AfterInsert')
+    DROP TRIGGER [dbo].[trg_WF_TBL022_AfterInsert]
+GO
+
+CREATE TRIGGER [dbo].[trg_WF_TBL022_AfterInsert]
+ON [dbo].[TBL022]
+AFTER INSERT
+AS
+BEGIN
+    SET NOCOUNT ON;
+    
+    DECLARE @CardGuide uniqueidentifier
+    DECLARE @GuidStr nvarchar(50)
+    
+    DECLARE c CURSOR FOR SELECT CardGuide FROM inserted
+    OPEN c
+    FETCH NEXT FROM c INTO @CardGuide
+    
+    WHILE @@FETCH_STATUS = 0
+    BEGIN
+        SET @GuidStr = CAST(@CardGuide AS nvarchar(50))
+        EXEC Approve_CreateFirstProcess 
+            @Param1 = 'TBL022', 
+            @Param2 = @GuidStr, 
+            @Param3 = 'OnAfterInsert'
+            
+        FETCH NEXT FROM c INTO @CardGuide
+    END
+    
+    CLOSE c
+    DEALLOCATE c
+END
+GO
+
+-- 13. Trigger for TBL085 (Inventory/Store)
+IF EXISTS (SELECT * FROM sys.triggers WHERE name = 'trg_WF_TBL085_AfterInsert')
+    DROP TRIGGER [dbo].[trg_WF_TBL085_AfterInsert]
+GO
+
+CREATE TRIGGER [dbo].[trg_WF_TBL085_AfterInsert]
+ON [dbo].[TBL085]
+AFTER INSERT
+AS
+BEGIN
+    SET NOCOUNT ON;
+    
+    DECLARE @CardGuide uniqueidentifier
+    DECLARE @GuidStr nvarchar(50)
+    
+    DECLARE c CURSOR FOR SELECT CardGuide FROM inserted
+    OPEN c
+    FETCH NEXT FROM c INTO @CardGuide
+    
+    WHILE @@FETCH_STATUS = 0
+    BEGIN
+        SET @GuidStr = CAST(@CardGuide AS nvarchar(50))
+        EXEC Approve_CreateFirstProcess 
+            @Param1 = 'TBL085', 
+            @Param2 = @GuidStr, 
+            @Param3 = 'OnAfterInsert'
+            
+        FETCH NEXT FROM c INTO @CardGuide
+    END
+    
+    CLOSE c
+    DEALLOCATE c
+END
+GO
