@@ -34,25 +34,41 @@ namespace Wafek_Web_Manager.Services
         {
             try
             {
+                // First try environment variables
+                var envServer = Environment.GetEnvironmentVariable("DbServer");
+                var envDb = Environment.GetEnvironmentVariable("DbName");
+                var envUser = Environment.GetEnvironmentVariable("DbUser");
+                var envPass = Environment.GetEnvironmentVariable("DbPassword");
+                
+                if (!string.IsNullOrEmpty(envServer) && !string.IsNullOrEmpty(envUser))
+                {
+                    _connectionString = $"Server={envServer};Database={envDb};User Id={envUser};Password={envPass};TrustServerCertificate=True;Encrypt=False;Connect Timeout=30;";
+                }
+                
                 var configPath = ConfigHelper.GetConfigFilePath();
                 if (System.IO.File.Exists(configPath))
                 {
                     var json = System.IO.File.ReadAllText(configPath);
                     var settings = JsonSerializer.Deserialize<JsonElement>(json);
 
-                    var server = settings.GetProperty("DbServer").GetString();
-                    var db = settings.GetProperty("DbName").GetString();
-                    var user = settings.GetProperty("DbUser").GetString();
-                    var pass = settings.GetProperty("DbPassword").GetString();
-                    _connectionString = $"Server={server};Database={db};User Id={user};Password={pass};TrustServerCertificate=True;Encrypt=False;Connect Timeout=30;";
+                    // If not set by env vars, read from file
+                    if (string.IsNullOrEmpty(_connectionString))
+                    {
+                        var server = settings.GetProperty("DbServer").GetString();
+                        var db = settings.GetProperty("DbName").GetString();
+                        var user = settings.GetProperty("DbUser").GetString();
+                        var pass = settings.GetProperty("DbPassword").GetString();
+                        _connectionString = $"Server={server};Database={db};User Id={user};Password={pass};TrustServerCertificate=True;Encrypt=False;Connect Timeout=30;";
+                    }
 
-                    if (settings.TryGetProperty("SmtpServer", out var s)) _smtpServer = s.GetString();
+                    if (settings.TryGetProperty("SmtpServer", out var s)) _smtpServer = s.GetString() ?? "";
                     if (settings.TryGetProperty("SmtpPort", out var p)) _smtpPort = p.GetInt32();
-                    if (settings.TryGetProperty("SenderEmail", out var e)) _senderEmail = e.GetString();
+                    if (settings.TryGetProperty("SenderEmail", out var e)) _senderEmail = e.GetString() ?? "";
                     if (settings.TryGetProperty("SenderPassword", out var sp)) _senderPassword = (sp.GetString() ?? "").Replace(" ", "").Trim();
                     if (settings.TryGetProperty("ApproveBaseUrl", out var url)) _approveBaseUrl = url.GetString() ?? "";
                     if (settings.TryGetProperty("ApproveUrlOverride", out var ov)) _approveUrlOverride = ov.GetString() ?? "";
                 }
+                
                 var envSmtp = Environment.GetEnvironmentVariable("SmtpServer");
                 if (!string.IsNullOrWhiteSpace(envSmtp)) _smtpServer = envSmtp.Trim();
                 
