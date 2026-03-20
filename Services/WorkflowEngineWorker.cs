@@ -21,6 +21,7 @@ namespace Wafek_Web_Manager.Services
         private int _smtpPort = 587;
         private string _senderEmail = "";
         private string _senderPassword = "";
+        private bool EnableSsl = true;
         private string _approveBaseUrl = "";
         private string _approveUrlOverride = ""; // اختياري: نموذج كامل مثل https://example.com/Approve?ref={logId}
 
@@ -65,6 +66,7 @@ namespace Wafek_Web_Manager.Services
                     if (settings.TryGetProperty("SmtpPort", out var p)) _smtpPort = p.GetInt32();
                     if (settings.TryGetProperty("SenderEmail", out var e)) _senderEmail = e.GetString() ?? "";
                     if (settings.TryGetProperty("SenderPassword", out var sp)) _senderPassword = (sp.GetString() ?? "").Replace(" ", "").Trim();
+                    if (settings.TryGetProperty("EnableSsl", out var sslProp)) EnableSsl = sslProp.GetBoolean();
                     if (settings.TryGetProperty("ApproveBaseUrl", out var url)) _approveBaseUrl = url.GetString() ?? "";
                     if (settings.TryGetProperty("ApproveUrlOverride", out var ov)) _approveUrlOverride = ov.GetString() ?? "";
                 }
@@ -80,6 +82,9 @@ namespace Wafek_Web_Manager.Services
                 
                 var envPass2 = Environment.GetEnvironmentVariable("SenderPassword");
                 if (!string.IsNullOrWhiteSpace(envPass2)) _senderPassword = envPass2.Replace(" ", "").Trim();
+                
+                var envSsl = Environment.GetEnvironmentVariable("EnableSsl");
+                if (!string.IsNullOrWhiteSpace(envSsl) && bool.TryParse(envSsl, out bool ssl)) EnableSsl = ssl;
 
                 var envUrl = Environment.GetEnvironmentVariable("APPROVE_BASE_URL");
                 if (!string.IsNullOrWhiteSpace(envUrl)) _approveBaseUrl = envUrl.Trim();
@@ -266,12 +271,23 @@ namespace Wafek_Web_Manager.Services
                 message.Body = bodyBuilder.ToMessageBody();
 
                 using var client = new MailKit.Net.Smtp.SmtpClient();
-                // Enable verbose logging to console to see exactly what SMTP server says
+                // Override default certificate validation to ignore invalid certs
                 client.ServerCertificateValidationCallback = (s, c, h, e) => true;
+                client.Timeout = 60000;
                 
-                var secureOptions = _smtpPort == 587 ? SecureSocketOptions.StartTls : SecureSocketOptions.SslOnConnect;
+                // Allow using 587 with SSL (StartTls) or 465 with SSL (SslOnConnect)
+                var secureOptions = SecureSocketOptions.Auto;
+                if (EnableSsl)
+                {
+                    if (_smtpPort == 465) secureOptions = SecureSocketOptions.SslOnConnect;
+                    else if (_smtpPort == 587) secureOptions = SecureSocketOptions.StartTls;
+                }
+                else
+                {
+                    secureOptions = SecureSocketOptions.None;
+                }
                 
-                _logger.LogInformation($"Attempting SMTP Connect to {_smtpServer}:{_smtpPort}...");
+                _logger.LogInformation($"Attempting SMTP Connect to {_smtpServer}:{_smtpPort} using {secureOptions}...");
                 client.Connect(_smtpServer, _smtpPort, secureOptions);
                 
                 _logger.LogInformation($"Attempting SMTP Auth for {_senderEmail}...");
