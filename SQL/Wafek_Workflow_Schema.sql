@@ -317,30 +317,49 @@ CREATE PROCEDURE [dbo].[Approve_OnApproved]
 AS
 BEGIN
     SET NOCOUNT ON;
+    DECLARE @sql nvarchar(500)
 
     -- السند: TBL010
     IF @SourceTable = 'TBL010'
     BEGIN
         IF COL_LENGTH('dbo.TBL010', 'Security') IS NOT NULL
-            UPDATE TBL010 SET Security = 2 WHERE CardGuide = @SourceId;
+        BEGIN
+            SET @sql = 'UPDATE TBL010 SET Security = 2 WHERE CardGuide = @id'
+            EXEC sp_executesql @sql, N'@id uniqueidentifier', @id = @SourceId
+        END
         ELSE IF COL_LENGTH('dbo.TBL010', 'SecurityLevel') IS NOT NULL
-            UPDATE TBL010 SET SecurityLevel = 2 WHERE CardGuide = @SourceId;
+        BEGIN
+            SET @sql = 'UPDATE TBL010 SET SecurityLevel = 2 WHERE CardGuide = @id'
+            EXEC sp_executesql @sql, N'@id uniqueidentifier', @id = @SourceId
+        END
     END
     -- الفاتورة: TBL022
     ELSE IF @SourceTable = 'TBL022'
     BEGIN
         IF COL_LENGTH('dbo.TBL022', 'Security') IS NOT NULL
-            UPDATE TBL022 SET Security = 2 WHERE CardGuide = @SourceId;
+        BEGIN
+            SET @sql = 'UPDATE TBL022 SET Security = 2 WHERE CardGuide = @id'
+            EXEC sp_executesql @sql, N'@id uniqueidentifier', @id = @SourceId
+        END
         ELSE IF COL_LENGTH('dbo.TBL022', 'SecurityLevel') IS NOT NULL
-            UPDATE TBL022 SET SecurityLevel = 2 WHERE CardGuide = @SourceId;
+        BEGIN
+            SET @sql = 'UPDATE TBL022 SET SecurityLevel = 2 WHERE CardGuide = @id'
+            EXEC sp_executesql @sql, N'@id uniqueidentifier', @id = @SourceId
+        END
     END
     -- الأرشيف: TBL085
     ELSE IF @SourceTable = 'TBL085'
     BEGIN
         IF COL_LENGTH('dbo.TBL085', 'Security') IS NOT NULL
-            UPDATE TBL085 SET Security = 2 WHERE CardGuide = @SourceId;
+        BEGIN
+            SET @sql = 'UPDATE TBL085 SET Security = 2 WHERE CardGuide = @id'
+            EXEC sp_executesql @sql, N'@id uniqueidentifier', @id = @SourceId
+        END
         ELSE IF COL_LENGTH('dbo.TBL085', 'SecurityLevel') IS NOT NULL
-            UPDATE TBL085 SET SecurityLevel = 2 WHERE CardGuide = @SourceId;
+        BEGIN
+            SET @sql = 'UPDATE TBL085 SET SecurityLevel = 2 WHERE CardGuide = @id'
+            EXEC sp_executesql @sql, N'@id uniqueidentifier', @id = @SourceId
+        END
     END
 END
 GO
@@ -356,21 +375,31 @@ CREATE PROCEDURE [dbo].[Approve_OnRejected]
 AS
 BEGIN
     SET NOCOUNT ON;
+    DECLARE @sql nvarchar(500)
 
     IF @SourceTable = 'TBL010'
     BEGIN
         IF COL_LENGTH('dbo.TBL010', 'RejectReason') IS NOT NULL
-            UPDATE TBL010 SET RejectReason = N'مرفوض من الموافق' WHERE CardGuide = @SourceId;
+        BEGIN
+            SET @sql = N'UPDATE TBL010 SET RejectReason = N''مرفوض من الموافق'' WHERE CardGuide = @id'
+            EXEC sp_executesql @sql, N'@id uniqueidentifier', @id = @SourceId
+        END
     END
     ELSE IF @SourceTable = 'TBL022'
     BEGIN
         IF COL_LENGTH('dbo.TBL022', 'RejectReason') IS NOT NULL
-            UPDATE TBL022 SET RejectReason = N'مرفوض من الموافق' WHERE CardGuide = @SourceId;
+        BEGIN
+            SET @sql = N'UPDATE TBL022 SET RejectReason = N''مرفوض من الموافق'' WHERE CardGuide = @id'
+            EXEC sp_executesql @sql, N'@id uniqueidentifier', @id = @SourceId
+        END
     END
     ELSE IF @SourceTable = 'TBL085'
     BEGIN
         IF COL_LENGTH('dbo.TBL085', 'RejectReason') IS NOT NULL
-            UPDATE TBL085 SET RejectReason = N'مرفوض من الموافق' WHERE CardGuide = @SourceId;
+        BEGIN
+            SET @sql = N'UPDATE TBL085 SET RejectReason = N''مرفوض من الموافق'' WHERE CardGuide = @id'
+            EXEC sp_executesql @sql, N'@id uniqueidentifier', @id = @SourceId
+        END
     END
 END
 GO
