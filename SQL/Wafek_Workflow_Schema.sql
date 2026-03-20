@@ -309,20 +309,38 @@ GO
 IF EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[Approve_OnApproved]') AND type in (N'P', N'PC'))
     DROP PROCEDURE [dbo].[Approve_OnApproved]
 GO
+
 CREATE PROCEDURE [dbo].[Approve_OnApproved]
-    @LogId bigint, @SourceTable nvarchar(50), @SourceId uniqueidentifier
+    @LogId bigint,
+    @SourceTable nvarchar(50),
+    @SourceId uniqueidentifier
 AS
-BEGIN SET NOCOUNT ON;
-    DECLARE @col nvarchar(50), @sql nvarchar(500)
-    IF @SourceTable IN ('TBL010','TBL022','TBL085')
+BEGIN
+    SET NOCOUNT ON;
+
+    -- السند: TBL010
+    IF @SourceTable = 'TBL010'
     BEGIN
-        IF   COL_LENGTH('dbo.' + @SourceTable, 'Security')      IS NOT NULL SET @col = 'Security'
-        ELSE IF COL_LENGTH('dbo.' + @SourceTable, 'SecurityLevel') IS NOT NULL SET @col = 'SecurityLevel'
-        IF @col IS NOT NULL
-        BEGIN
-            SET @sql = 'UPDATE ' + @SourceTable + ' SET ' + @col + ' = 2 WHERE CardGuide = @id'
-            EXEC sp_executesql @sql, N'@id uniqueidentifier', @id = @SourceId
-        END
+        IF COL_LENGTH('dbo.TBL010', 'Security') IS NOT NULL
+            UPDATE TBL010 SET Security = 2 WHERE CardGuide = @SourceId;
+        ELSE IF COL_LENGTH('dbo.TBL010', 'SecurityLevel') IS NOT NULL
+            UPDATE TBL010 SET SecurityLevel = 2 WHERE CardGuide = @SourceId;
+    END
+    -- الفاتورة: TBL022
+    ELSE IF @SourceTable = 'TBL022'
+    BEGIN
+        IF COL_LENGTH('dbo.TBL022', 'Security') IS NOT NULL
+            UPDATE TBL022 SET Security = 2 WHERE CardGuide = @SourceId;
+        ELSE IF COL_LENGTH('dbo.TBL022', 'SecurityLevel') IS NOT NULL
+            UPDATE TBL022 SET SecurityLevel = 2 WHERE CardGuide = @SourceId;
+    END
+    -- الأرشيف: TBL085
+    ELSE IF @SourceTable = 'TBL085'
+    BEGIN
+        IF COL_LENGTH('dbo.TBL085', 'Security') IS NOT NULL
+            UPDATE TBL085 SET Security = 2 WHERE CardGuide = @SourceId;
+        ELSE IF COL_LENGTH('dbo.TBL085', 'SecurityLevel') IS NOT NULL
+            UPDATE TBL085 SET SecurityLevel = 2 WHERE CardGuide = @SourceId;
     END
 END
 GO
@@ -330,16 +348,29 @@ GO
 IF EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[Approve_OnRejected]') AND type in (N'P', N'PC'))
     DROP PROCEDURE [dbo].[Approve_OnRejected]
 GO
+
 CREATE PROCEDURE [dbo].[Approve_OnRejected]
-    @LogId bigint, @SourceTable nvarchar(50), @SourceId uniqueidentifier
+    @LogId bigint,
+    @SourceTable nvarchar(50),
+    @SourceId uniqueidentifier
 AS
-BEGIN SET NOCOUNT ON;
-    DECLARE @sql nvarchar(500)
-    IF @SourceTable IN ('TBL010','TBL022','TBL085')
-        AND COL_LENGTH('dbo.' + @SourceTable, 'RejectReason') IS NOT NULL
+BEGIN
+    SET NOCOUNT ON;
+
+    IF @SourceTable = 'TBL010'
     BEGIN
-        SET @sql = N'UPDATE ' + @SourceTable + N' SET RejectReason = N''مرفوض من الموافق'' WHERE CardGuide = @id'
-        EXEC sp_executesql @sql, N'@id uniqueidentifier', @id = @SourceId
+        IF COL_LENGTH('dbo.TBL010', 'RejectReason') IS NOT NULL
+            UPDATE TBL010 SET RejectReason = N'مرفوض من الموافق' WHERE CardGuide = @SourceId;
+    END
+    ELSE IF @SourceTable = 'TBL022'
+    BEGIN
+        IF COL_LENGTH('dbo.TBL022', 'RejectReason') IS NOT NULL
+            UPDATE TBL022 SET RejectReason = N'مرفوض من الموافق' WHERE CardGuide = @SourceId;
+    END
+    ELSE IF @SourceTable = 'TBL085'
+    BEGIN
+        IF COL_LENGTH('dbo.TBL085', 'RejectReason') IS NOT NULL
+            UPDATE TBL085 SET RejectReason = N'مرفوض من الموافق' WHERE CardGuide = @SourceId;
     END
 END
 GO
