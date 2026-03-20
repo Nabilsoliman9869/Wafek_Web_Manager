@@ -288,6 +288,8 @@ namespace Wafek_Web_Manager.Services
                 }
                 
                 _logger.LogInformation($"Attempting SMTP Connect to {_smtpServer}:{_smtpPort} using {secureOptions}...");
+                // Some SMTP servers require a longer timeout for the initial handshake
+                client.Timeout = 120000; // 120 seconds
                 client.Connect(_smtpServer, _smtpPort, secureOptions);
                 
                 _logger.LogInformation($"Attempting SMTP Auth for {_senderEmail}...");
