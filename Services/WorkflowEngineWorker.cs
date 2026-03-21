@@ -21,7 +21,6 @@ namespace Wafek_Web_Manager.Services
         private int _smtpPort = 587;
         private string _senderEmail = "";
         private string _senderPassword = "";
-        private bool EnableSsl = true;
         private string _approveBaseUrl = "";
         private string _approveUrlOverride = ""; // اختياري: نموذج كامل مثل https://example.com/Approve?ref={logId}
 
@@ -35,57 +34,25 @@ namespace Wafek_Web_Manager.Services
         {
             try
             {
-                // First try environment variables
-                var envServer = Environment.GetEnvironmentVariable("DbServer");
-                var envDb = Environment.GetEnvironmentVariable("DbName");
-                var envUser = Environment.GetEnvironmentVariable("DbUser");
-                var envPass = Environment.GetEnvironmentVariable("DbPassword");
-                
-                if (!string.IsNullOrEmpty(envServer) && !string.IsNullOrEmpty(envUser))
-                {
-                    _connectionString = $"Server={envServer};Database={envDb};User Id={envUser};Password={envPass};TrustServerCertificate=True;Encrypt=False;Connect Timeout=30;";
-                }
-                
                 var configPath = ConfigHelper.GetConfigFilePath();
                 if (System.IO.File.Exists(configPath))
                 {
                     var json = System.IO.File.ReadAllText(configPath);
                     var settings = JsonSerializer.Deserialize<JsonElement>(json);
 
-                    // If not set by env vars, read from file
-                    if (string.IsNullOrEmpty(_connectionString))
-                    {
-                        var server = settings.GetProperty("DbServer").GetString();
-                        var db = settings.GetProperty("DbName").GetString();
-                        var user = settings.GetProperty("DbUser").GetString();
-                        var pass = settings.GetProperty("DbPassword").GetString();
-                        _connectionString = $"Server={server};Database={db};User Id={user};Password={pass};TrustServerCertificate=True;Encrypt=False;Connect Timeout=30;";
-                    }
+                    var server = settings.GetProperty("DbServer").GetString();
+                    var db = settings.GetProperty("DbName").GetString();
+                    var user = settings.GetProperty("DbUser").GetString();
+                    var pass = settings.GetProperty("DbPassword").GetString();
+                    _connectionString = $"Server={server};Database={db};User Id={user};Password={pass};TrustServerCertificate=True;Encrypt=False;Connect Timeout=30;";
 
-                    if (settings.TryGetProperty("SmtpServer", out var s)) _smtpServer = s.GetString() ?? "";
+                    if (settings.TryGetProperty("SmtpServer", out var s)) _smtpServer = s.GetString();
                     if (settings.TryGetProperty("SmtpPort", out var p)) _smtpPort = p.GetInt32();
-                    if (settings.TryGetProperty("SenderEmail", out var e)) _senderEmail = e.GetString() ?? "";
+                    if (settings.TryGetProperty("SenderEmail", out var e)) _senderEmail = e.GetString();
                     if (settings.TryGetProperty("SenderPassword", out var sp)) _senderPassword = (sp.GetString() ?? "").Replace(" ", "").Trim();
-                    if (settings.TryGetProperty("EnableSsl", out var sslProp)) EnableSsl = sslProp.GetBoolean();
                     if (settings.TryGetProperty("ApproveBaseUrl", out var url)) _approveBaseUrl = url.GetString() ?? "";
                     if (settings.TryGetProperty("ApproveUrlOverride", out var ov)) _approveUrlOverride = ov.GetString() ?? "";
                 }
-                
-                var envSmtp = Environment.GetEnvironmentVariable("SmtpServer");
-                if (!string.IsNullOrWhiteSpace(envSmtp)) _smtpServer = envSmtp.Trim();
-                
-                var envPort = Environment.GetEnvironmentVariable("SmtpPort");
-                if (!string.IsNullOrWhiteSpace(envPort) && int.TryParse(envPort, out int ep)) _smtpPort = ep;
-                
-                var envEmail = Environment.GetEnvironmentVariable("SenderEmail");
-                if (!string.IsNullOrWhiteSpace(envEmail)) _senderEmail = envEmail.Trim();
-                
-                var envPass2 = Environment.GetEnvironmentVariable("SenderPassword");
-                if (!string.IsNullOrWhiteSpace(envPass2)) _senderPassword = envPass2.Replace(" ", "").Trim();
-                
-                var envSsl = Environment.GetEnvironmentVariable("EnableSsl");
-                if (!string.IsNullOrWhiteSpace(envSsl) && bool.TryParse(envSsl, out bool ssl)) EnableSsl = ssl;
-
                 var envUrl = Environment.GetEnvironmentVariable("APPROVE_BASE_URL");
                 if (!string.IsNullOrWhiteSpace(envUrl)) _approveBaseUrl = envUrl.Trim();
                 if (string.IsNullOrEmpty(_approveBaseUrl))
@@ -105,25 +72,20 @@ namespace Wafek_Web_Manager.Services
 
             while (!stoppingToken.IsCancellationRequested)
             {
+                if (string.IsNullOrEmpty(_connectionString))
+                {
+                    LoadSettings(); // Try to reload if failed
+                    await Task.Delay(10000, stoppingToken);
+                    continue;
+                }
+
                 try
                 {
-                    if (string.IsNullOrEmpty(_connectionString))
-                    {
-                        LoadSettings();
-                        if (string.IsNullOrEmpty(_connectionString))
-                        {
-                            _logger.LogWarning("Connection string is empty. Waiting for configuration...");
-                            await Task.Delay(10000, stoppingToken);
-                            continue;
-                        }
-                    }
-
-                    _logger.LogInformation($"Polling for pending workflow steps... Connection string starts with: {_connectionString.Substring(0, Math.Min(20, _connectionString.Length))}...");
                     await ProcessPendingSteps();
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError(ex, "Error occurred in Workflow Engine Worker.");
+                    _logger.LogError(ex, "Error processing workflow steps");
                 }
 
                 await Task.Delay(10000, stoppingToken); // Check every 10 seconds
@@ -132,11 +94,9 @@ namespace Wafek_Web_Manager.Services
 
         private async Task ProcessPendingSteps()
         {
-            _logger.LogInformation("Connecting to database to check for Pending steps...");
             using (var conn = new SqlConnection(_connectionString))
             {
                 await conn.OpenAsync();
-                _logger.LogInformation("Database connected successfully.");
 
                 // 1. Get Pending Steps (SendEmail) + StepCondition + EmailFormatQuery للتقييم قبل الإرسال
                 var sqlWithFormat = @"
@@ -152,31 +112,25 @@ namespace Wafek_Web_Manager.Services
                 {
                     using (var cmd = new SqlCommand(sqlWithFormat, conn))
                     using (var reader = await cmd.ExecuteReaderAsync())
+                    {
+                        while (await reader.ReadAsync())
                         {
-                            bool found = false;
-                            while (await reader.ReadAsync())
+                            long logId = reader.GetInt64(0);
+                            Guid sourceId = reader.GetGuid(2);
+                            string selectedValue = reader.IsDBNull(5) ? "" : reader.GetString(5);
+                            string sourceTable = reader.GetString(6);
+                            string stepCondition = reader.IsDBNull(7) ? "" : reader.GetString(7);
+                            string? emailFormatQuery = reader.FieldCount > 8 && !reader.IsDBNull(8) ? reader.GetString(8) : null;
+
+                            if (!string.IsNullOrWhiteSpace(stepCondition) && !EvaluateStepCondition(conn, sourceTable, sourceId, stepCondition))
                             {
-                                found = true;
-                                long logId = reader.GetInt64(0);
-                                Guid sourceId = reader.GetGuid(2);
-                                string selectedValue = reader.IsDBNull(5) ? "" : reader.GetString(5);
-                                string sourceTable = reader.GetString(6);
-                                string stepCondition = reader.IsDBNull(7) ? "" : reader.GetString(7);
-                                string? emailFormatQuery = reader.FieldCount > 8 && !reader.IsDBNull(8) ? reader.GetString(8) : null;
-
-                                _logger.LogInformation($"Found Pending Step: LogId={logId}, SourceTable={sourceTable}, ActionType=SendEmail");
-
-                                if (!string.IsNullOrWhiteSpace(stepCondition) && !EvaluateStepCondition(conn, sourceTable, sourceId, stepCondition))
-                                {
-                                    _logger.LogInformation($"Condition failed for LogId={logId}. Skipping...");
-                                    AdvanceOrFailStep(logId, reader.GetInt32(1), reader.GetInt32(3));
-                                    continue;
-                                }
-
-                                await SendEmailForStep(logId, sourceId, selectedValue, sourceTable, emailFormatQuery);
+                                AdvanceOrFailStep(logId, reader.GetInt32(1), reader.GetInt32(3));
+                                continue;
                             }
-                            if (!found) _logger.LogInformation("No Pending SendEmail steps found.");
+
+                            await SendEmailForStep(logId, sourceId, selectedValue, sourceTable, emailFormatQuery);
                         }
+                    }
                 }
                 catch (Microsoft.Data.SqlClient.SqlException)
                 {
@@ -271,34 +225,10 @@ namespace Wafek_Web_Manager.Services
                 message.Body = bodyBuilder.ToMessageBody();
 
                 using var client = new MailKit.Net.Smtp.SmtpClient();
-                // Override default certificate validation to ignore invalid certs
-                client.ServerCertificateValidationCallback = (s, c, h, e) => true;
-                client.Timeout = 60000;
-                
-                // Allow using 587 with SSL (StartTls) or 465 with SSL (SslOnConnect)
-                var secureOptions = SecureSocketOptions.Auto;
-                if (EnableSsl)
-                {
-                    if (_smtpPort == 465) secureOptions = SecureSocketOptions.SslOnConnect;
-                    else if (_smtpPort == 587) secureOptions = SecureSocketOptions.StartTls;
-                }
-                else
-                {
-                    secureOptions = SecureSocketOptions.None;
-                }
-                
-                _logger.LogInformation($"Attempting SMTP Connect to {_smtpServer}:{_smtpPort} using {secureOptions}...");
-                // Some SMTP servers require a longer timeout for the initial handshake
-                client.Timeout = 120000; // 120 seconds
+                var secureOptions = _smtpPort == 587 ? SecureSocketOptions.StartTls : SecureSocketOptions.SslOnConnect;
                 client.Connect(_smtpServer, _smtpPort, secureOptions);
-                
-                _logger.LogInformation($"Attempting SMTP Auth for {_senderEmail}...");
                 client.Authenticate(_senderEmail, _senderPassword);
-                
-                _logger.LogInformation($"Attempting SMTP Send to {recipientEmail}...");
                 client.Send(message);
-                
-                _logger.LogInformation($"SMTP Send Complete. Disconnecting...");
                 client.Disconnect(true);
 
                 UpdateLogStatus(logId, "WaitingForResponse", $"Email sent to {recipientEmail}");
@@ -307,9 +237,7 @@ namespace Wafek_Web_Manager.Services
             catch (Exception ex)
             {
                 _logger.LogError(ex, $"Failed to send email for LogId {logId}");
-                string errorMsg = ex.Message;
-                if (ex.InnerException != null) errorMsg += " | Inner: " + ex.InnerException.Message;
-                UpdateLogStatus(logId, "Error", "Email failed: " + errorMsg);
+                UpdateLogStatus(logId, "Error", "Email failed: " + ex.Message + " (Inner: " + (ex.InnerException?.Message ?? "None") + ")");
             }
         }
 
