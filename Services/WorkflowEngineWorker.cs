@@ -53,12 +53,33 @@ namespace Wafek_Web_Manager.Services
                     if (settings.TryGetProperty("ApproveBaseUrl", out var url)) _approveBaseUrl = url.GetString() ?? "";
                     if (settings.TryGetProperty("ApproveUrlOverride", out var ov)) _approveUrlOverride = ov.GetString() ?? "";
                 }
+                // Environment Variables — DB (override or fallback if file missing)
+                var envDbServer = Environment.GetEnvironmentVariable("DbServer");
+                var envDbName   = Environment.GetEnvironmentVariable("DbName");
+                var envDbUser   = Environment.GetEnvironmentVariable("DbUser");
+                var envDbPass   = Environment.GetEnvironmentVariable("DbPassword");
+                if (!string.IsNullOrWhiteSpace(envDbServer) && !string.IsNullOrWhiteSpace(envDbUser))
+                    _connectionString = $"Server={envDbServer};Database={envDbName};User Id={envDbUser};Password={envDbPass};TrustServerCertificate=True;Encrypt=False;Connect Timeout=30;";
+
+                // Environment Variables — SMTP (override or fallback if file missing)
+                var envSmtp = Environment.GetEnvironmentVariable("SmtpServer");
+                if (!string.IsNullOrWhiteSpace(envSmtp)) _smtpServer = envSmtp.Trim();
+                var envPort = Environment.GetEnvironmentVariable("SmtpPort");
+                if (!string.IsNullOrWhiteSpace(envPort) && int.TryParse(envPort, out int parsedPort)) _smtpPort = parsedPort;
+                var envEmail = Environment.GetEnvironmentVariable("SenderEmail");
+                if (!string.IsNullOrWhiteSpace(envEmail)) _senderEmail = envEmail.Trim();
+                var envPass2 = Environment.GetEnvironmentVariable("SenderPassword");
+                if (!string.IsNullOrWhiteSpace(envPass2)) _senderPassword = envPass2.Replace(" ", "").Trim();
+
+                // Environment Variables — URLs
                 var envUrl = Environment.GetEnvironmentVariable("APPROVE_BASE_URL");
                 if (!string.IsNullOrWhiteSpace(envUrl)) _approveBaseUrl = envUrl.Trim();
                 if (string.IsNullOrEmpty(_approveBaseUrl))
                     _approveBaseUrl = (Environment.GetEnvironmentVariable("RENDER_EXTERNAL_URL") ?? "").Trim();
                 var envOverride = Environment.GetEnvironmentVariable("APPROVE_URL_OVERRIDE");
                 if (!string.IsNullOrWhiteSpace(envOverride)) _approveUrlOverride = envOverride;
+
+                _logger.LogInformation($"Settings loaded — DB: {(string.IsNullOrEmpty(_connectionString) ? "MISSING" : "OK")}, SMTP: {_smtpServer}:{_smtpPort}, Email: {_senderEmail}");
             }
             catch (Exception ex)
             {
