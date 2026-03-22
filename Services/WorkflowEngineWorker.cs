@@ -268,6 +268,7 @@ namespace Wafek_Web_Manager.Services
                 using var client = new MailKit.Net.Smtp.SmtpClient();
                 // Enable verbose logging to console to see exactly what SMTP server says
                 client.ServerCertificateValidationCallback = (s, c, h, e) => true;
+                client.Timeout = 120000; // 120 seconds timeout to handle Render latency
                 
                 var secureOptions = _smtpPort == 587 ? SecureSocketOptions.StartTls : SecureSocketOptions.SslOnConnect;
                 
