@@ -270,9 +270,10 @@ namespace Wafek_Web_Manager.Services
                 client.ServerCertificateValidationCallback = (s, c, h, e) => true;
                 client.Timeout = 120000; // 120 seconds timeout to handle Render latency
                 
-                var secureOptions = _smtpPort == 587 ? SecureSocketOptions.StartTls : SecureSocketOptions.SslOnConnect;
+                // Force Auto to let MailKit decide the best secure option based on the port and server capabilities
+                var secureOptions = SecureSocketOptions.Auto;
                 
-                _logger.LogInformation($"Attempting SMTP Connect to {_smtpServer}:{_smtpPort}...");
+                _logger.LogInformation($"Attempting SMTP Connect to {_smtpServer}:{_smtpPort} with Auto options...");
                 client.Connect(_smtpServer, _smtpPort, secureOptions);
                 
                 _logger.LogInformation($"Attempting SMTP Auth for {_senderEmail}...");
