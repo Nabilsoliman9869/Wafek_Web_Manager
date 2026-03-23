@@ -22,7 +22,6 @@ namespace Wafek_Web_Manager.Services
         {
             return Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "images", "TELLEWORK.jpg");
         }
-
         /// <summary>
         /// الحصول على اللوجو كـ base64 — يدعم jpg/png — واضح في Gmail
         /// عند فشل القراءة يُستخدم رابط CDN احتياطي
@@ -57,7 +56,7 @@ namespace Wafek_Web_Manager.Services
         }
 
         /// <summary>رابط احتياطي للوجو عند فشل base64 (مثلاً على Render)</summary>
-        public static string GetLogoFallbackUrl() => "https://raw.githubusercontent.com/Nabilsoliman9869/Wafek_Web_Manager/main/wwwroot/images/TELLEWORK.jpg";
+        public string GetLogoFallbackUrl() => "https://raw.githubusercontent.com/Nabilsoliman9869/Wafek_Web_Manager/main/wwwroot/images/TELLEWORK.jpg";
 
         public EmailBodyBuilder(string connectionString)
         {
