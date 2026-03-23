@@ -148,6 +148,7 @@ namespace Wafek_Web_Manager.Pages
                 var sourceId = r.GetGuid(1);
                 var sourceTable = r.GetString(4);
                 var selectedValue = r.IsDBNull(5) ? "" : r.GetString(5);
+                r.Close();
 
                 var builder = new EmailBodyBuilder(connStr);
                 var docData = builder.GetDocumentData(sourceId, sourceTable);
