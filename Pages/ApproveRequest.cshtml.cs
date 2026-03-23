@@ -144,13 +144,18 @@ namespace Wafek_Web_Manager.Pages
                     JOIN WF_Steps S ON S.WorkflowDefinitionId = L.WorkflowDefinitionId AND S.StepOrder = L.CurrentStepOrder
                     WHERE L.Id = @id {statusCondition}", conn);
                 cmd.Parameters.AddWithValue("@id", LogId);
-                using var r = cmd.ExecuteReader();
-                if (!r.Read()) return;
-
-                var sourceId = r.GetGuid(1);
-                var sourceTable = r.GetString(4);
-                var selectedValue = r.IsDBNull(5) ? "" : r.GetString(5);
-                r.Close();
+                
+                Guid sourceId;
+                string sourceTable;
+                string selectedValue;
+                
+                using (var r = cmd.ExecuteReader())
+                {
+                    if (!r.Read()) return;
+                    sourceId = r.GetGuid(1);
+                    sourceTable = r.GetString(4);
+                    selectedValue = r.IsDBNull(5) ? "" : r.GetString(5);
+                }
 
                 var builder = new EmailBodyBuilder(connStr);
                 var docData = builder.GetDocumentData(sourceId, sourceTable);
