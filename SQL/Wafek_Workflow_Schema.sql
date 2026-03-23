@@ -332,6 +332,13 @@ BEGIN
             SET @sql = 'UPDATE TBL010 SET SecurityLevel = 2 WHERE CardGuide = @id'
             EXEC sp_executesql @sql, N'@id uniqueidentifier', @id = @SourceId
         END
+        
+        -- اعتماد / ترحيل السند (تغيير Posted إلى 1)
+        IF COL_LENGTH('dbo.TBL010', 'Posted') IS NOT NULL
+        BEGIN
+            SET @sql = 'UPDATE TBL010 SET Posted = 1 WHERE CardGuide = @id'
+            EXEC sp_executesql @sql, N'@id uniqueidentifier', @id = @SourceId
+        END
     END
     -- الفاتورة: TBL022
     ELSE IF @SourceTable = 'TBL022'

@@ -38,6 +38,7 @@ AS
 BEGIN SET NOCOUNT ON;
     IF @SourceTable = 'TBL010' AND COL_LENGTH('dbo.TBL010', 'Security') IS NOT NULL UPDATE TBL010 SET Security = 2 WHERE CardGuide = @SourceId;
     ELSE IF @SourceTable = 'TBL010' AND COL_LENGTH('dbo.TBL010', 'SecurityLevel') IS NOT NULL UPDATE TBL010 SET SecurityLevel = 2 WHERE CardGuide = @SourceId;
+    IF @SourceTable = 'TBL010' AND COL_LENGTH('dbo.TBL010', 'Posted') IS NOT NULL UPDATE TBL010 SET Posted = 1 WHERE CardGuide = @SourceId;
     ELSE IF @SourceTable = 'TBL022' AND COL_LENGTH('dbo.TBL022', 'Security') IS NOT NULL UPDATE TBL022 SET Security = 2 WHERE CardGuide = @SourceId;
     ELSE IF @SourceTable = 'TBL022' AND COL_LENGTH('dbo.TBL022', 'SecurityLevel') IS NOT NULL UPDATE TBL022 SET SecurityLevel = 2 WHERE CardGuide = @SourceId;
     ELSE IF @SourceTable = 'TBL085' AND COL_LENGTH('dbo.TBL085', 'Security') IS NOT NULL UPDATE TBL085 SET Security = 2 WHERE CardGuide = @SourceId;

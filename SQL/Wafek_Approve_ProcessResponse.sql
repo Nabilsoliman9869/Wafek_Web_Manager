@@ -115,8 +115,15 @@ CREATE PROCEDURE [dbo].[Approve_OnApproved]
 AS
 BEGIN
 	IF @SourceTable = 'TBL010'
-		UPDATE TBL010 SET [حقل_الحالة] = N'معتمد' WHERE CardGuide = @SourceId
-	-- أضف جداول أخرى حسب الحاجة
+	BEGIN
+	    -- تعديل الحماية إلى معتمد
+		IF COL_LENGTH('dbo.TBL010', 'Security') IS NOT NULL
+			UPDATE TBL010 SET Security = 2 WHERE CardGuide = @SourceId;
+			
+		-- ترحيل السند
+		IF COL_LENGTH('dbo.TBL010', 'Posted') IS NOT NULL
+			UPDATE TBL010 SET Posted = 1 WHERE CardGuide = @SourceId;
+	END
 END
 GO
 

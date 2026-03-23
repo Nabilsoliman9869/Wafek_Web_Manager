@@ -7,7 +7,7 @@
 -- التنفيذ: UPDATE [الجدول] SET Security = المستوى WHERE CardGuide = @SourceId
 -- =============================================================================
 
--- Approve_OnApproved: عند الموافقة (#1#) — رفع Security للمستند
+-- Approve_OnApproved: عند الموافقة (#1#) — رفع Security و Posted للمستند
 IF EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[Approve_OnApproved]') AND type in (N'P', N'PC'))
     DROP PROCEDURE [dbo].[Approve_OnApproved]
 GO
@@ -27,7 +27,10 @@ BEGIN
             UPDATE TBL010 SET Security = 2 WHERE CardGuide = @SourceId;
         ELSE IF COL_LENGTH('dbo.TBL010', 'SecurityLevel') IS NOT NULL
             UPDATE TBL010 SET SecurityLevel = 2 WHERE CardGuide = @SourceId;
-        -- أو حسب حقل الحالة في منظومتك
+            
+        -- الترحيل عند الموافقة (تغيير حالة Posted إلى 1)
+        IF COL_LENGTH('dbo.TBL010', 'Posted') IS NOT NULL
+            UPDATE TBL010 SET Posted = 1 WHERE CardGuide = @SourceId;
     END
 
     -- الفاتورة: TBL022
