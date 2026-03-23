@@ -57,7 +57,7 @@ namespace Wafek_Web_Manager.Services
         }
 
         /// <summary>رابط احتياطي للوجو عند فشل base64 (مثلاً على Render)</summary>
-        public static string GetLogoFallbackUrl() => "https://i.ibb.co/NynTy6Q/xtra-wafek-logo.png";
+        public static string GetLogoFallbackUrl() => "https://raw.githubusercontent.com/Nabilsoliman9869/Wafek_Web_Manager/main/wwwroot/images/TELLEWORK.jpg";
 
         public EmailBodyBuilder(string connectionString)
         {
@@ -325,30 +325,32 @@ WHERE d.MainGuide = @id", conn);
             try
             {
                 var detCmd = new SqlCommand(@"
-SELECT TBL004.AccountName AS [الحساب],
-    SUM(ISNULL(d.DebitRate,0)) AS [مدين],
-    SUM(ISNULL(d.CreditRate,0)) AS [دائن],
-    MAX(ISNULL(d.TruncatedNotes,d.Notes)) AS [البيان]
+SELECT acc.AccountCode,
+       acc.AccountName AS [الحساب],
+       ISNULL(d.DebitRate,0) AS [مدين],
+       ISNULL(d.CreditRate,0) AS [دائن],
+       ISNULL(d.TruncatedNotes,d.Notes) AS [البيان],
+       cc.CostCenter AS [مركز الكلفة]
 FROM TBL038 d
-LEFT JOIN TBL004 ON d.AccountGuide = TBL004.CardGuide
-WHERE d.MainGuide = @id
-GROUP BY TBL004.AccountName", conn);
+LEFT JOIN TBL004 acc ON d.AccountGuide = acc.CardGuide
+LEFT JOIN TBL005 cc ON d.CostCenter = cc.CardGuide
+WHERE d.MainGuide = @id", conn);
                 detCmd.Parameters.AddWithValue("@id", sourceId);
                 using var rd = detCmd.ExecuteReader();
                 decimal sum = 0;
                 while (rd.Read())
                 {
-                    var debit = rd.FieldCount > 1 ? GetDecimalByOrdinal(rd, 1) : 0;
-                    var credit = rd.FieldCount > 2 ? GetDecimalByOrdinal(rd, 2) : 0;
+                    var debit = GetDecimal(rd, "مدين");
+                    var credit = GetDecimal(rd, "دائن");
                     sum += debit + credit;
                     data.BondDetails.Add(new BondDetailRow
                     {
-                        AccountCode = "",
-                        AccountName = rd.FieldCount > 0 ? (rd.GetValue(0)?.ToString() ?? "") : "",
+                        AccountCode = GetColVal(rd, "AccountCode") ?? "",
+                        AccountName = GetColVal(rd, "الحساب") ?? "",
                         Debit = debit,
                         Credit = credit,
-                        Notes = rd.FieldCount > 3 ? (rd.GetValue(3)?.ToString() ?? "") : "",
-                        CostCenterName = ""
+                        Notes = GetColVal(rd, "البيان") ?? "",
+                        CostCenterName = GetColVal(rd, "مركز الكلفة") ?? ""
                     });
                 }
                 if (data.BondDetails.Count > 0 && string.IsNullOrEmpty(data.TotalAmount) && sum != 0)
@@ -356,44 +358,7 @@ GROUP BY TBL004.AccountName", conn);
             }
             catch { }
 
-            // 2) احتياطي: TBL038 سطر بسطر (بدون تجميع)
-            if (data.BondDetails.Count == 0)
-            {
-                try
-                {
-                    var detCmd = new SqlCommand(@"
-SELECT acc.AccountName,
-    ISNULL(d.DebitRate,0) AS DebitRate,
-    ISNULL(d.CreditRate,0) AS CreditRate,
-    ISNULL(d.TruncatedNotes,d.Notes) AS Notes
-FROM TBL038 d
-LEFT JOIN TBL004 acc ON acc.CardGuide = d.AccountGuide
-WHERE d.MainGuide = @id", conn);
-                    detCmd.Parameters.AddWithValue("@id", sourceId);
-                    using var rd = detCmd.ExecuteReader();
-                    decimal sum = 0;
-                    while (rd.Read())
-                    {
-                        var debit = GetDecimal(rd, "DebitRate");
-                        var credit = GetDecimal(rd, "CreditRate");
-                        sum += debit + credit;
-                        data.BondDetails.Add(new BondDetailRow
-                        {
-                            AccountCode = "",
-                            AccountName = GetColVal(rd, "AccountName") ?? "",
-                            Debit = debit,
-                            Credit = credit,
-                            Notes = GetColVal(rd, "Notes") ?? "",
-                            CostCenterName = ""
-                        });
-                    }
-                    if (data.BondDetails.Count > 0 && string.IsNullOrEmpty(data.TotalAmount) && sum != 0)
-                        data.TotalAmount = sum.ToString("N2");
-                }
-                catch { }
-            }
-
-            // احتياطي: TBL011/TBL012 — عندما تستخدم المنظومة هذا الهيكل بدل TBL038
+            // 2) احتياطي: TBL011/TBL012 — عندما تستخدم المنظومة هذا الهيكل بدل TBL038
             if (data.BondDetails.Count == 0)
             {
                 try
