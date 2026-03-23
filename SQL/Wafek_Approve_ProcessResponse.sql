@@ -123,6 +123,12 @@ BEGIN
 		-- ترحيل السند
 		IF COL_LENGTH('dbo.TBL010', 'Posted') IS NOT NULL
 			UPDATE TBL010 SET Posted = 1 WHERE CardGuide = @SourceId;
+			
+		-- توليد القيد المحاسبي في إكسترا إذا كان الإجراء Prc027 موجوداً
+		IF OBJECT_ID('dbo.Prc027', 'P') IS NOT NULL
+		BEGIN
+			EXEC dbo.Prc027 @SourceId;
+		END
 	END
 END
 GO

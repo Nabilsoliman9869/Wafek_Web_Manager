@@ -339,6 +339,12 @@ BEGIN
             SET @sql = 'UPDATE TBL010 SET Posted = 1 WHERE CardGuide = @id'
             EXEC sp_executesql @sql, N'@id uniqueidentifier', @id = @SourceId
         END
+        
+        -- توليد القيد في إكسترا (Prc027)
+        IF OBJECT_ID('dbo.Prc027', 'P') IS NOT NULL
+        BEGIN
+            EXEC dbo.Prc027 @SourceId
+        END
     END
     -- الفاتورة: TBL022
     ELSE IF @SourceTable = 'TBL022'

@@ -31,6 +31,12 @@ BEGIN
         -- الترحيل عند الموافقة (تغيير حالة Posted إلى 1)
         IF COL_LENGTH('dbo.TBL010', 'Posted') IS NOT NULL
             UPDATE TBL010 SET Posted = 1 WHERE CardGuide = @SourceId;
+            
+        -- توليد القيد المحاسبي في إكسترا (TBL011 و TBL012)
+        IF OBJECT_ID('dbo.Prc027', 'P') IS NOT NULL
+        BEGIN
+            EXEC dbo.Prc027 @SourceId;
+        END
     END
 
     -- الفاتورة: TBL022
