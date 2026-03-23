@@ -156,6 +156,11 @@ namespace Wafek_Web_Manager.Pages
                     sourceTable = r.GetString(4);
                     selectedValue = r.IsDBNull(5) ? "" : r.GetString(5);
                 }
+                
+                // IMPORTANT: Close the connection here before calling EmailBodyBuilder, 
+                // because EmailBodyBuilder uses the same connection string and might 
+                // cause "There is already an open DataReader" if MARS is not enabled.
+                conn.Close();
 
                 var builder = new EmailBodyBuilder(connStr);
                 var docData = builder.GetDocumentData(sourceId, sourceTable);
