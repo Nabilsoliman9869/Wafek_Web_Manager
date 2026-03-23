@@ -395,9 +395,10 @@ SELECT '' AS AccountCode,
        d.Notes AS [البيان],
        cc.CostCenter AS [مركز الكلفة]
 FROM TBL038 d
+INNER JOIN TBL010 h ON d.MainGuide = h.CardGuide
 LEFT JOIN TBL004 acc ON d.AccountGuide = acc.CardGuide
 LEFT JOIN TBL005 cc ON d.CostCenter = cc.CardGuide
-WHERE d.MainGuide = @id", conn);
+WHERE h.CardGuide = @id", conn);
                     detCmd.Parameters.AddWithValue("@id", sourceId);
                     using var rd = detCmd.ExecuteReader();
                     decimal sum = 0;
