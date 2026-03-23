@@ -22,6 +22,9 @@ namespace Wafek_Web_Manager.Services
 
         private bool IsImapEnabled()
         {
+            var envEnabled = Environment.GetEnvironmentVariable("ImapEnabled");
+            if (!string.IsNullOrWhiteSpace(envEnabled) && bool.TryParse(envEnabled, out var b)) return b;
+
             try
             {
                 if (!System.IO.File.Exists("appsettings.custom.json")) return false;
@@ -34,19 +37,38 @@ namespace Wafek_Web_Manager.Services
 
         private (string? Host, int Port, SecureSocketOptions Secure, string? User, string? Pass) LoadImapSettings()
         {
+            string? host = null, user = null, pass = null;
+            int port = 993;
+
             try
             {
-                if (!System.IO.File.Exists("appsettings.custom.json")) return (null, 993, SecureSocketOptions.SslOnConnect, null, null);
-                var json = System.IO.File.ReadAllText("appsettings.custom.json");
-                var s = JsonSerializer.Deserialize<JsonElement>(json);
-                var host = s.TryGetProperty("ImapServer", out var h) ? h.GetString() : null;
-                var port = s.TryGetProperty("ImapPort", out var p) ? p.GetInt32() : 993;
-                var user = s.TryGetProperty("SenderEmail", out var u) ? u.GetString() : null;
-                var pass = s.TryGetProperty("SenderPassword", out var pw) ? (pw.GetString() ?? "").Replace(" ", "").Trim() : null;
-                var secure = port == 993 ? SecureSocketOptions.SslOnConnect : SecureSocketOptions.StartTls;
-                return (host, port, secure, user, pass);
+                if (System.IO.File.Exists("appsettings.custom.json"))
+                {
+                    var json = System.IO.File.ReadAllText("appsettings.custom.json");
+                    var s = JsonSerializer.Deserialize<JsonElement>(json);
+                    host = s.TryGetProperty("ImapServer", out var h) ? h.GetString() : null;
+                    port = s.TryGetProperty("ImapPort", out var p) ? p.GetInt32() : 993;
+                    user = s.TryGetProperty("SenderEmail", out var u) ? u.GetString() : null;
+                    pass = s.TryGetProperty("SenderPassword", out var pw) ? (pw.GetString() ?? "").Replace(" ", "").Trim() : null;
+                }
             }
-            catch { return (null, 993, SecureSocketOptions.SslOnConnect, null, null); }
+            catch { }
+
+            // Override with Environment Variables for Render
+            var envImap = Environment.GetEnvironmentVariable("ImapServer");
+            if (!string.IsNullOrWhiteSpace(envImap)) host = envImap.Trim();
+            
+            var envPort = Environment.GetEnvironmentVariable("ImapPort");
+            if (!string.IsNullOrWhiteSpace(envPort) && int.TryParse(envPort, out var prt)) port = prt;
+            
+            var envEmail = Environment.GetEnvironmentVariable("SenderEmail");
+            if (!string.IsNullOrWhiteSpace(envEmail)) user = envEmail.Trim();
+            
+            var envPass = Environment.GetEnvironmentVariable("SenderPassword");
+            if (!string.IsNullOrWhiteSpace(envPass)) pass = envPass.Trim();
+
+            var secure = port == 993 ? SecureSocketOptions.SslOnConnect : SecureSocketOptions.StartTls;
+            return (host, port, secure, user, pass);
         }
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)

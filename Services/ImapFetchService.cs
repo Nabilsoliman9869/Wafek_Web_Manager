@@ -41,6 +41,19 @@ namespace Wafek_Web_Manager.Services
                 if (s.TryGetProperty("SenderPassword", out var pw)) _senderPassword = (pw.GetString() ?? "").Replace(" ", "").Trim();
             }
             catch { }
+            
+            // Read from environment variables for Render compatibility
+            var envImap = Environment.GetEnvironmentVariable("ImapServer");
+            if (!string.IsNullOrWhiteSpace(envImap)) _imapServer = envImap.Trim();
+            
+            var envPort = Environment.GetEnvironmentVariable("ImapPort");
+            if (!string.IsNullOrWhiteSpace(envPort) && int.TryParse(envPort, out var p)) _imapPort = p;
+            
+            var envEmail = Environment.GetEnvironmentVariable("SenderEmail");
+            if (!string.IsNullOrWhiteSpace(envEmail)) _senderEmail = envEmail.Trim();
+            
+            var envPass = Environment.GetEnvironmentVariable("SenderPassword");
+            if (!string.IsNullOrWhiteSpace(envPass)) _senderPassword = envPass.Trim();
         }
 
         /// <summary>
