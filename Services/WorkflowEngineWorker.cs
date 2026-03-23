@@ -4,10 +4,10 @@ using System.Threading.Tasks;
 using System.Data.SqlClient;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using MailKit.Net.Smtp;
-using MailKit.Security;
-using MimeKit;
 using System.Text.Json;
+using System.Net.Http;
+using System.Text;
+using System.Collections.Generic;
 
 namespace Wafek_Web_Manager.Services
 {
@@ -16,13 +16,12 @@ namespace Wafek_Web_Manager.Services
         private readonly ILogger<WorkflowEngineWorker> _logger;
         private string _connectionString = "";
         
-        // SMTP Settings
-        private string _smtpServer = "";
-        private int _smtpPort = 587;
+        // SMTP/API Settings
         private string _senderEmail = "";
-        private string _senderPassword = "";
+        private string _brevoApiKey = ""; // New API Key variable
         private string _approveBaseUrl = "";
         private string _approveUrlOverride = ""; // اختياري: نموذج كامل مثل https://example.com/Approve?ref={logId}
+        private static readonly HttpClient _httpClient = new HttpClient(); // For Brevo API
 
         public WorkflowEngineWorker(ILogger<WorkflowEngineWorker> logger)
         {
@@ -61,25 +60,18 @@ namespace Wafek_Web_Manager.Services
                         _connectionString = $"Server={server};Database={db};User Id={user};Password={pass};TrustServerCertificate=True;Encrypt=False;Connect Timeout=30;";
                     }
 
-                    if (settings.TryGetProperty("SmtpServer", out var s)) _smtpServer = s.GetString() ?? "";
-                    if (settings.TryGetProperty("SmtpPort", out var p)) _smtpPort = p.GetInt32();
                     if (settings.TryGetProperty("SenderEmail", out var e)) _senderEmail = e.GetString() ?? "";
-                    if (settings.TryGetProperty("SenderPassword", out var sp)) _senderPassword = (sp.GetString() ?? "").Replace(" ", "").Trim();
+                    if (settings.TryGetProperty("BrevoApiKey", out var key)) _brevoApiKey = key.GetString() ?? "";
                     if (settings.TryGetProperty("ApproveBaseUrl", out var url)) _approveBaseUrl = url.GetString() ?? "";
                     if (settings.TryGetProperty("ApproveUrlOverride", out var ov)) _approveUrlOverride = ov.GetString() ?? "";
                 }
                 
-                var envSmtp = Environment.GetEnvironmentVariable("SmtpServer");
-                if (!string.IsNullOrWhiteSpace(envSmtp)) _smtpServer = envSmtp.Trim();
-                
-                var envPort = Environment.GetEnvironmentVariable("SmtpPort");
-                if (!string.IsNullOrWhiteSpace(envPort) && int.TryParse(envPort, out int ep)) _smtpPort = ep;
-                
                 var envEmail = Environment.GetEnvironmentVariable("SenderEmail");
                 if (!string.IsNullOrWhiteSpace(envEmail)) _senderEmail = envEmail.Trim();
                 
-                var envPass2 = Environment.GetEnvironmentVariable("SenderPassword");
-                if (!string.IsNullOrWhiteSpace(envPass2)) _senderPassword = envPass2.Replace(" ", "").Trim();
+                // Read Brevo API Key from Environment
+                var envApiKey = Environment.GetEnvironmentVariable("BrevoApiKey");
+                if (!string.IsNullOrWhiteSpace(envApiKey)) _brevoApiKey = envApiKey.Trim();
 
                 var envUrl = Environment.GetEnvironmentVariable("APPROVE_BASE_URL");
                 if (!string.IsNullOrWhiteSpace(envUrl)) _approveBaseUrl = envUrl.Trim();
@@ -255,38 +247,42 @@ namespace Wafek_Web_Manager.Services
                     ? builder.BuildBodyArabic(docData, recipientName, approveLink, documentBlock)
                     : builder.BuildBodyEnglish(docData, recipientName, approveLink, documentBlock);
 
-                var message = new MimeMessage();
-                message.MessageId = $"<wafek-{logId}@wafek>";
-                message.From.Add(new MailboxAddress("TelleWork", _senderEmail));
-                message.To.Add(new MailboxAddress("", recipientEmail));
-                message.Subject = subject;
+                _logger.LogInformation($"Attempting to send email via Brevo HTTP API to {recipientEmail}...");
 
-                var bodyBuilder = new MimeKit.BodyBuilder();
-                bodyBuilder.HtmlBody = body;
-                message.Body = bodyBuilder.ToMessageBody();
+                var payload = new
+                {
+                    sender = new { name = "TelleWork", email = _senderEmail },
+                    to = new[] { new { email = recipientEmail } },
+                    subject = subject,
+                    htmlContent = body,
+                    headers = new Dictionary<string, string>
+                    {
+                        { "Message-Id", $"<wafek-{logId}@wafek>" },
+                        { "In-Reply-To", $"<wafek-{logId}@wafek>" },
+                        { "References", $"<wafek-{logId}@wafek>" }
+                    }
+                };
 
-                using var client = new MailKit.Net.Smtp.SmtpClient();
-                // Enable verbose logging to console to see exactly what SMTP server says
-                client.ServerCertificateValidationCallback = (s, c, h, e) => true;
-                client.Timeout = 120000; // 120 seconds timeout to handle Render latency
-                
-                // Force Auto to let MailKit decide the best secure option based on the port and server capabilities
-                var secureOptions = SecureSocketOptions.Auto;
-                
-                _logger.LogInformation($"Attempting SMTP Connect to {_smtpServer}:{_smtpPort} with Auto options...");
-                client.Connect(_smtpServer, _smtpPort, secureOptions);
-                
-                _logger.LogInformation($"Attempting SMTP Auth for {_senderEmail}...");
-                client.Authenticate(_senderEmail, _senderPassword);
-                
-                _logger.LogInformation($"Attempting SMTP Send to {recipientEmail}...");
-                client.Send(message);
-                
-                _logger.LogInformation($"SMTP Send Complete. Disconnecting...");
-                client.Disconnect(true);
+                var jsonPayload = JsonSerializer.Serialize(payload);
+                var content = new StringContent(jsonPayload, Encoding.UTF8, "application/json");
 
-                UpdateLogStatus(logId, "WaitingForResponse", $"Email sent to {recipientEmail}");
-                _logger.LogInformation($"Email sent successfully to {recipientEmail} for LogId {logId}");
+                var request = new HttpRequestMessage(HttpMethod.Post, "https://api.brevo.com/v3/smtp/email");
+                request.Headers.Add("api-key", _brevoApiKey);
+                request.Headers.Add("accept", "application/json");
+                request.Content = content;
+
+                var response = await _httpClient.SendAsync(request);
+
+                if (response.IsSuccessStatusCode)
+                {
+                    UpdateLogStatus(logId, "WaitingForResponse", $"Email sent to {recipientEmail}");
+                    _logger.LogInformation($"Email sent successfully to {recipientEmail} via Brevo API for LogId {logId}");
+                }
+                else
+                {
+                    var responseBody = await response.Content.ReadAsStringAsync();
+                    throw new Exception($"Brevo API Error: {response.StatusCode} - {responseBody}");
+                }
             }
             catch (Exception ex)
             {
