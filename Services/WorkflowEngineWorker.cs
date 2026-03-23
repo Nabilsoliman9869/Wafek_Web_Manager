@@ -120,82 +120,94 @@ namespace Wafek_Web_Manager.Services
         private async Task ProcessPendingSteps()
         {
             _logger.LogInformation("Connecting to database to check for Pending steps...");
-            using (var conn = new SqlConnection(_connectionString))
+            
+            var pendingLogs = new List<PendingLogDto>();
+
+            // Phase 1: Collect
+            try
             {
-                await conn.OpenAsync();
-                _logger.LogInformation("Database connected successfully.");
-
-                // 1. Get Pending Steps (SendEmail) + StepCondition + EmailFormatQuery للتقييم قبل الإرسال
-                var sqlWithFormat = @"
-                    SELECT TOP 10 L.Id, L.WorkflowDefinitionId, L.SourceRecordId, L.CurrentStepOrder, 
-                           S.ActionType, S.SelectedValue, D.SourceTable, S.StepCondition,
-                           D.EmailFormatQuery
-                    FROM WF_Logs L
-                    JOIN WF_Definitions D ON L.WorkflowDefinitionId = D.Id
-                    JOIN WF_Steps S ON L.WorkflowDefinitionId = S.WorkflowDefinitionId AND L.CurrentStepOrder = S.StepOrder
-                    WHERE L.Status = 'Pending' AND S.ActionType = 'SendEmail'";
-
-                try
+                using (var conn = new SqlConnection(_connectionString))
                 {
+                    await conn.OpenAsync();
+                    _logger.LogInformation("Database connected successfully.");
+
+                    var sqlWithFormat = @"
+                        SELECT TOP 10 L.Id, L.WorkflowDefinitionId, L.SourceRecordId, L.CurrentStepOrder, 
+                               S.ActionType, S.SelectedValue, D.SourceTable, S.StepCondition,
+                               D.EmailFormatQuery
+                        FROM WF_Logs L
+                        JOIN WF_Definitions D ON L.WorkflowDefinitionId = D.Id
+                        JOIN WF_Steps S ON L.WorkflowDefinitionId = S.WorkflowDefinitionId AND L.CurrentStepOrder = S.StepOrder
+                        WHERE L.Status = 'Pending' AND S.ActionType = 'SendEmail'";
+
                     using (var cmd = new SqlCommand(sqlWithFormat, conn))
-                    using (var reader = await cmd.ExecuteReaderAsync())
-                        {
-                            bool found = false;
-                            while (await reader.ReadAsync())
-                            {
-                                found = true;
-                                long logId = reader.GetInt64(0);
-                                Guid sourceId = reader.GetGuid(2);
-                                string selectedValue = reader.IsDBNull(5) ? "" : reader.GetString(5);
-                                string sourceTable = reader.GetString(6);
-                                string stepCondition = reader.IsDBNull(7) ? "" : reader.GetString(7);
-                                string? emailFormatQuery = reader.FieldCount > 8 && !reader.IsDBNull(8) ? reader.GetString(8) : null;
-
-                                _logger.LogInformation($"Found Pending Step: LogId={logId}, SourceTable={sourceTable}, ActionType=SendEmail");
-
-                                if (!string.IsNullOrWhiteSpace(stepCondition) && !EvaluateStepCondition(conn, sourceTable, sourceId, stepCondition))
-                                {
-                                    _logger.LogInformation($"Condition failed for LogId={logId}. Skipping...");
-                                    AdvanceOrFailStep(logId, reader.GetInt32(1), reader.GetInt32(3));
-                                    continue;
-                                }
-
-                                await SendEmailForStep(logId, sourceId, selectedValue, sourceTable, emailFormatQuery);
-                            }
-                            if (!found) _logger.LogInformation("No Pending SendEmail steps found.");
-                        }
-                }
-                catch (Microsoft.Data.SqlClient.SqlException)
-                {
-                    var sqlWithoutFormat = @"
-                    SELECT TOP 10 L.Id, L.WorkflowDefinitionId, L.SourceRecordId, L.CurrentStepOrder,
-                           S.ActionType, S.SelectedValue, D.SourceTable, S.StepCondition
-                    FROM WF_Logs L
-                    JOIN WF_Definitions D ON L.WorkflowDefinitionId = D.Id
-                    JOIN WF_Steps S ON L.WorkflowDefinitionId = S.WorkflowDefinitionId AND L.CurrentStepOrder = S.StepOrder
-                    WHERE L.Status = 'Pending' AND S.ActionType = 'SendEmail'";
-                    using (var cmd = new SqlCommand(sqlWithoutFormat, conn))
                     using (var reader = await cmd.ExecuteReaderAsync())
                     {
                         while (await reader.ReadAsync())
                         {
-                            long logId = reader.GetInt64(0);
-                            Guid sourceId = reader.GetGuid(2);
-                            string selectedValue = reader.IsDBNull(5) ? "" : reader.GetString(5);
-                            string sourceTable = reader.GetString(6);
-                            string stepCondition = reader.IsDBNull(7) ? "" : reader.GetString(7);
-
-                            if (!string.IsNullOrWhiteSpace(stepCondition) && !EvaluateStepCondition(conn, sourceTable, sourceId, stepCondition))
+                            pendingLogs.Add(new PendingLogDto
                             {
-                                AdvanceOrFailStep(logId, reader.GetInt32(1), reader.GetInt32(3));
-                                continue;
-                            }
-
-                            await SendEmailForStep(logId, sourceId, selectedValue, sourceTable, null);
+                                LogId = reader.GetInt64(0),
+                                WorkflowDefinitionId = reader.GetInt32(1),
+                                SourceId = reader.GetGuid(2),
+                                CurrentStepOrder = reader.GetInt32(3),
+                                SelectedValue = reader.IsDBNull(5) ? "" : reader.GetString(5),
+                                SourceTable = reader.GetString(6),
+                                StepCondition = reader.IsDBNull(7) ? "" : reader.GetString(7),
+                                EmailFormatQuery = reader.FieldCount > 8 && !reader.IsDBNull(8) ? reader.GetString(8) : null
+                            });
                         }
                     }
-                }
+                } // SqlConnection and SqlDataReader are completely closed and disposed here
             }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error collecting pending steps.");
+                return;
+            }
+
+            if (!pendingLogs.Any())
+            {
+                _logger.LogInformation("No Pending SendEmail steps found.");
+                return;
+            }
+
+            // Phase 2: Process
+            foreach (var log in pendingLogs)
+            {
+                _logger.LogInformation($"Processing Pending Step: LogId={log.LogId}, SourceTable={log.SourceTable}, ActionType=SendEmail");
+
+                bool conditionPassed = true;
+                if (!string.IsNullOrWhiteSpace(log.StepCondition))
+                {
+                    using (var conn = new SqlConnection(_connectionString))
+                    {
+                        await conn.OpenAsync();
+                        conditionPassed = EvaluateStepCondition(conn, log.SourceTable, log.SourceId, log.StepCondition);
+                    }
+                }
+
+                if (!conditionPassed)
+                {
+                    _logger.LogInformation($"Condition failed for LogId={log.LogId}. Skipping...");
+                    AdvanceOrFailStep(log.LogId, log.WorkflowDefinitionId, log.CurrentStepOrder);
+                    continue;
+                }
+
+                await SendEmailForStep(log.LogId, log.SourceId, log.SelectedValue, log.SourceTable, log.EmailFormatQuery);
+            }
+        }
+
+        private class PendingLogDto
+        {
+            public long LogId { get; set; }
+            public int WorkflowDefinitionId { get; set; }
+            public Guid SourceId { get; set; }
+            public int CurrentStepOrder { get; set; }
+            public string SelectedValue { get; set; } = "";
+            public string SourceTable { get; set; } = "";
+            public string StepCondition { get; set; } = "";
+            public string? EmailFormatQuery { get; set; }
         }
 
         private async Task SendEmailForStep(long logId, Guid sourceId, string recipientRule, string sourceTable, string? emailFormatQuery = null)
@@ -213,8 +225,8 @@ namespace Wafek_Web_Manager.Services
                 string recipientName = ResolveRecipientName(recipientRule, sourceId, sourceTable);
                 bool useArabic = GetRecipientLanguage(recipientRule) == 1;
 
-                var builder = new EmailBodyBuilder(_connectionString);
-                var docData = builder.GetDocumentData(sourceId, sourceTable);
+            var builder = new EmailBodyBuilder(_connectionString);
+            var docData = builder.GetDocumentData(sourceId, sourceTable);
 
                 // المستند الكامل داخل الميل — رأس السند + جدول الحسابات (من الاستعلام)
                 string? documentBlock = null;
