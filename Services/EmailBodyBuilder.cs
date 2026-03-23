@@ -271,8 +271,40 @@ WHERE MainGuide = @id", conn);
                     data.ProjectName = GetColVal(r, "ProjectName") ?? "";
                     data.AccountName = GetColVal(r, "AccountName") ?? "";
                 }
+                else
+                {
+                    // Fallback
+                    r.Close();
+                    var fcmd = new SqlCommand(@"
+SELECT TOP 1
+    br.BronchName AS BranchName,
+    cc.CostCenter AS CostCenterName,
+    p.ProjectName,
+    cur.CurrencyName,
+    acc.AccountName
+FROM TBL010 h
+LEFT JOIN TBL050 br ON br.CardGuide = h.Branch
+LEFT JOIN TBL005 cc ON cc.CardGuide = h.CostCenter
+LEFT JOIN TBL049 p ON p.CardGuide = h.Project
+LEFT JOIN TBL001 cur ON cur.CardGuide = h.CurrencyGuide
+LEFT JOIN TBL004 acc ON acc.CardGuide = h.AccountGuide
+WHERE h.CardGuide = @id", conn);
+                    fcmd.Parameters.AddWithValue("@id", sourceId);
+                    using var r2 = fcmd.ExecuteReader();
+                    if (r2.Read())
+                    {
+                        data.BranchName = GetColVal(r2, "BranchName") ?? "";
+                        data.CostCenterName = GetColVal(r2, "CostCenterName") ?? "";
+                        data.ProjectName = GetColVal(r2, "ProjectName") ?? "";
+                        data.CurrencyName = GetColVal(r2, "CurrencyName") ?? "";
+                        data.AccountName = GetColVal(r2, "AccountName") ?? "";
+                    }
+                }
             }
-            catch { }
+            catch (Exception ex)
+            {
+                data.AccountName = "ERR: " + ex.Message;
+            }
 
             try
             {
@@ -315,6 +347,7 @@ WHERE MainGuide = @id", conn);
             catch { }
 
             // 1) TBL038 — المصدر الرئيسي: 10=رأس، 38=تفاصيل (MainGuide = TBL010.CardGuide)
+            string errorLog = "";
             try
             {
                 var detCmd = new SqlCommand(@"
@@ -347,7 +380,7 @@ WHERE MainGuide = @id", conn);
                 if (data.BondDetails.Count > 0 && string.IsNullOrEmpty(data.TotalAmount) && sum != 0)
                     data.TotalAmount = sum.ToString("N2");
             }
-            catch { }
+            catch (Exception ex) { errorLog += "QryErr: " + ex.Message + " | "; }
 
             // إذا كان QryApproveBondDetails فارغاً، نحاول TBL038
             if (data.BondDetails.Count == 0)
@@ -357,9 +390,9 @@ WHERE MainGuide = @id", conn);
                     var detCmd = new SqlCommand(@"
 SELECT '' AS AccountCode,
        acc.AccountName AS [الحساب],
-       ISNULL(d.DebitRate,0) AS [مدين],
-       ISNULL(d.CreditRate,0) AS [دائن],
-       ISNULL(d.TruncatedNotes,d.Notes) AS [البيان],
+       ISNULL(d.Debit,0) AS [مدين],
+       ISNULL(d.Credit,0) AS [دائن],
+       d.Notes AS [البيان],
        cc.CostCenter AS [مركز الكلفة]
 FROM TBL038 d
 LEFT JOIN TBL004 acc ON d.AccountGuide = acc.CardGuide
@@ -386,7 +419,12 @@ WHERE d.MainGuide = @id", conn);
                     if (data.BondDetails.Count > 0 && string.IsNullOrEmpty(data.TotalAmount) && sum != 0)
                         data.TotalAmount = sum.ToString("N2");
                 }
-                catch { }
+                catch (Exception ex) { errorLog += "FallbackErr: " + ex.Message; }
+            }
+            
+            if (!string.IsNullOrEmpty(errorLog) && data.BondDetails.Count == 0)
+            {
+                data.BondDetails.Add(new BondDetailRow { AccountName = "ERROR", Notes = errorLog });
             }
 
             // 2) احتياطي: TBL011/TBL012 — عندما تستخدم المنظومة هذا الهيكل بدل TBL038
