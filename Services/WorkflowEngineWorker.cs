@@ -225,8 +225,17 @@ namespace Wafek_Web_Manager.Services
                 string recipientName = ResolveRecipientName(recipientRule, sourceId, sourceTable);
                 bool useArabic = GetRecipientLanguage(recipientRule) == 1;
 
-            var builder = new EmailBodyBuilder(_connectionString);
-            var docData = builder.GetDocumentData(sourceId, sourceTable);
+                var docData = new DocumentData();
+                try
+                {
+                    // يجب أن نستخدم اتصالاً مستقلاً تماماً لبناء الإيميل لمنع تداخل DataReader
+                    var builder = new EmailBodyBuilder(_connectionString);
+                    docData = builder.GetDocumentData(sourceId, sourceTable);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Failed to get document data for Email");
+                }
 
                 // المستند الكامل داخل الميل — رأس السند + جدول الحسابات (من الاستعلام)
                 string? documentBlock = null;
