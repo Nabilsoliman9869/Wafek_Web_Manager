@@ -141,7 +141,7 @@ namespace Wafek_Web_Manager.Pages
                            D.SourceTable, S.SelectedValue
                     FROM WF_Logs L
                     JOIN WF_Definitions D ON D.Id = L.WorkflowDefinitionId
-                    JOIN WF_Steps S ON S.WorkflowDefinitionId = L.WorkflowDefinitionId AND S.StepOrder = L.CurrentStepOrder
+                    LEFT JOIN WF_Steps S ON S.WorkflowDefinitionId = L.WorkflowDefinitionId AND S.StepOrder = L.CurrentStepOrder
                     WHERE L.Id = @id {statusCondition}", conn);
                 cmd.Parameters.AddWithValue("@id", LogId);
                 

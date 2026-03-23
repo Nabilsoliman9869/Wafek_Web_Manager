@@ -256,18 +256,12 @@ WHERE d.MainGuide = @id", conn);
             {
                 var cmd = new SqlCommand(@"
 SELECT TOP 1
-    br.BronchName AS BranchName,
-    cc.CostCenter AS CostCenterName,
-    p.ProjectName,
-    cur.CurrencyName,
-    acc.AccountName
-FROM TBL038 d
-LEFT JOIN TBL050 br ON br.CardGuide = d.Branch
-LEFT JOIN TBL005 cc ON cc.CardGuide = d.CostCenter
-LEFT JOIN TBL049 p ON p.CardGuide = d.Project
-LEFT JOIN TBL001 cur ON cur.CardGuide = d.CurrencyGuide
-LEFT JOIN TBL004 acc ON acc.CardGuide = d.AccountGuide
-WHERE d.MainGuide = @id", conn);
+    BronchName AS BranchName,
+    CostCenter AS CostCenterName,
+    ProjectName,
+    AccountName
+FROM QryApproveBondDetails
+WHERE MainGuide = @id", conn);
                 cmd.Parameters.AddWithValue("@id", sourceId);
                 using var r = cmd.ExecuteReader();
                 if (r.Read())
@@ -275,7 +269,6 @@ WHERE d.MainGuide = @id", conn);
                     data.BranchName = GetColVal(r, "BranchName") ?? "";
                     data.CostCenterName = GetColVal(r, "CostCenterName") ?? "";
                     data.ProjectName = GetColVal(r, "ProjectName") ?? "";
-                    data.CurrencyName = GetColVal(r, "CurrencyName") ?? "";
                     data.AccountName = GetColVal(r, "AccountName") ?? "";
                 }
             }
@@ -325,16 +318,14 @@ WHERE d.MainGuide = @id", conn);
             try
             {
                 var detCmd = new SqlCommand(@"
-SELECT acc.AccountCode,
-       acc.AccountName AS [الحساب],
-       ISNULL(d.DebitRate,0) AS [مدين],
-       ISNULL(d.CreditRate,0) AS [دائن],
-       ISNULL(d.TruncatedNotes,d.Notes) AS [البيان],
-       cc.CostCenter AS [مركز الكلفة]
-FROM TBL038 d
-LEFT JOIN TBL004 acc ON d.AccountGuide = acc.CardGuide
-LEFT JOIN TBL005 cc ON d.CostCenter = cc.CardGuide
-WHERE d.MainGuide = @id", conn);
+SELECT '' AS AccountCode,
+       AccountName AS [الحساب],
+       Debit AS [مدين],
+       Credit AS [دائن],
+       Notes AS [البيان],
+       CostCenter AS [مركز الكلفة]
+FROM QryApproveBondDetails
+WHERE MainGuide = @id", conn);
                 detCmd.Parameters.AddWithValue("@id", sourceId);
                 using var rd = detCmd.ExecuteReader();
                 decimal sum = 0;
@@ -357,6 +348,46 @@ WHERE d.MainGuide = @id", conn);
                     data.TotalAmount = sum.ToString("N2");
             }
             catch { }
+
+            // إذا كان QryApproveBondDetails فارغاً، نحاول TBL038
+            if (data.BondDetails.Count == 0)
+            {
+                try
+                {
+                    var detCmd = new SqlCommand(@"
+SELECT '' AS AccountCode,
+       acc.AccountName AS [الحساب],
+       ISNULL(d.DebitRate,0) AS [مدين],
+       ISNULL(d.CreditRate,0) AS [دائن],
+       ISNULL(d.TruncatedNotes,d.Notes) AS [البيان],
+       cc.CostCenter AS [مركز الكلفة]
+FROM TBL038 d
+LEFT JOIN TBL004 acc ON d.AccountGuide = acc.CardGuide
+LEFT JOIN TBL005 cc ON d.CostCenter = cc.CardGuide
+WHERE d.MainGuide = @id", conn);
+                    detCmd.Parameters.AddWithValue("@id", sourceId);
+                    using var rd = detCmd.ExecuteReader();
+                    decimal sum = 0;
+                    while (rd.Read())
+                    {
+                        var debit = GetDecimal(rd, "مدين");
+                        var credit = GetDecimal(rd, "دائن");
+                        sum += debit + credit;
+                        data.BondDetails.Add(new BondDetailRow
+                        {
+                            AccountCode = "",
+                            AccountName = GetColVal(rd, "الحساب") ?? "",
+                            Debit = debit,
+                            Credit = credit,
+                            Notes = GetColVal(rd, "البيان") ?? "",
+                            CostCenterName = GetColVal(rd, "مركز الكلفة") ?? ""
+                        });
+                    }
+                    if (data.BondDetails.Count > 0 && string.IsNullOrEmpty(data.TotalAmount) && sum != 0)
+                        data.TotalAmount = sum.ToString("N2");
+                }
+                catch { }
+            }
 
             // 2) احتياطي: TBL011/TBL012 — عندما تستخدم المنظومة هذا الهيكل بدل TBL038
             if (data.BondDetails.Count == 0)

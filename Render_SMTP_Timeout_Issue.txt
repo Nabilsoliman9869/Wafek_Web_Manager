@@ -1,0 +1,45 @@
+**Problem Description:**
+We are experiencing a persistent `TimeoutException` when attempting to send emails using `MailKit` and `smtp.gmail.com` (and subsequently `smtp-relay.brevo.com`) from an ASP.NET Core background worker (IHostedService) deployed on **Render's Free Tier** (via Docker).
+
+**Error Log:**
+```
+fail: Wafek_Web_Manager.Services.WorkflowEngineWorker[0]
+      Failed to send email for LogId 58
+      System.TimeoutException: The operation has timed out.
+         at MailKit.Net.SocketUtils.Connect(String host, Int32 port, IPEndPoint localEndPoint, Int32 timeout, CancellationToken cancellationToken)
+         at MailKit.MailService.ConnectNetwork(String host, Int32 port, CancellationToken cancellationToken)
+         at MailKit.Net.Smtp.SmtpClient.Connect(String host, Int32 port, SecureSocketOptions options, CancellationToken cancellationToken)
+```
+
+**Context & What we tried:**
+1. The application successfully connects to the external SQL Server database, reads pending tasks, and attempts to send the email. The failure happens strictly during `client.Connect(...)`.
+2. We are using `MailKit.Net.Smtp.SmtpClient`.
+3. First, we tried using Gmail with an App Password. IMAP is enabled.
+4. We tried Port `587` with `SecureSocketOptions.StartTls`.
+5. We tried Port `465` with `SecureSocketOptions.SslOnConnect`.
+6. We tried `SecureSocketOptions.Auto`.
+7. We increased the timeout explicitly to 120 seconds: `client.Timeout = 120000;`.
+8. We bypassed SSL validation (just in case) using: `client.ServerCertificateValidationCallback = (s, c, h, e) => true;`.
+9. **UPDATE:** Thinking it was a Gmail restriction, we completely switched the provider to **Brevo (Sendinblue)** using `smtp-relay.brevo.com` on Port `587` and `465` with their official SMTP Key. The exact same `TimeoutException` occurred during `Connect()`.
+10. The exact same code works perfectly when run locally, but throws a `TimeoutException` consistently when deployed to Render Free Tier.
+
+**Relevant Code Snippet:**
+```csharp
+using var client = new MailKit.Net.Smtp.SmtpClient();
+client.ServerCertificateValidationCallback = (s, c, h, e) => true;
+client.Timeout = 120000; 
+
+// We tried Auto, StartTls (587), and SslOnConnect (465)
+var secureOptions = SecureSocketOptions.Auto; 
+
+// The exception is thrown on the line below:
+client.Connect("smtp-relay.brevo.com", 587, secureOptions); 
+client.Authenticate(_senderEmail, _senderPassword);
+client.Send(message);
+client.Disconnect(true);
+```
+
+**Questions:**
+1. Does Render's Free Tier actively block or throttle ALL outbound SMTP connections (ports 465/587) causing this silent drop/timeout, regardless of the provider (Gmail/Brevo)?
+2. Is there any specific configuration in Docker or Render that we missed that could allow this SMTP connection to pass through?
+3. If it is a hard Render Free Tier limitation, what is the best code implementation to switch from `MailKit` SMTP to Brevo's HTTP API (`HttpClient`) in C# to bypass the port blocking?
