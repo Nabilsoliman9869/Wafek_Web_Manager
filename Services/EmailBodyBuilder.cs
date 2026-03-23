@@ -424,7 +424,8 @@ WHERE d.MainGuide = @id", conn);
             
             if (!string.IsNullOrEmpty(errorLog) && data.BondDetails.Count == 0)
             {
-                data.BondDetails.Add(new BondDetailRow { AccountName = "ERROR", Notes = errorLog });
+                // إزالة رسالة الخطأ من العرض للمستخدم النهائي بعد نجاح التطوير
+                // data.BondDetails.Add(new BondDetailRow { AccountName = "ERROR", Notes = errorLog });
             }
 
             // 2) احتياطي: TBL011/TBL012 — عندما تستخدم المنظومة هذا الهيكل بدل TBL038
