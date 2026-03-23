@@ -303,7 +303,7 @@ WHERE h.CardGuide = @id", conn);
             }
             catch (Exception ex)
             {
-                data.AccountName = "ERR: " + ex.Message;
+                // data.AccountName = "ERR: " + ex.Message;
             }
 
             try
@@ -380,7 +380,7 @@ WHERE MainGuide = @id", conn);
                 if (data.BondDetails.Count > 0 && string.IsNullOrEmpty(data.TotalAmount) && sum != 0)
                     data.TotalAmount = sum.ToString("N2");
             }
-            catch (Exception ex) { errorLog += "QryErr: " + ex.Message + " | "; }
+            catch (Exception ex) { // errorLog += "QryErr: " + ex.Message + " | "; }
 
             // إذا كان QryApproveBondDetails فارغاً، نحاول TBL038
             if (data.BondDetails.Count == 0)
@@ -419,7 +419,7 @@ WHERE d.MainGuide = @id", conn);
                     if (data.BondDetails.Count > 0 && string.IsNullOrEmpty(data.TotalAmount) && sum != 0)
                         data.TotalAmount = sum.ToString("N2");
                 }
-                catch (Exception ex) { errorLog += "FallbackErr: " + ex.Message; }
+                catch (Exception ex) { // errorLog += "FallbackErr: " + ex.Message; }
             }
             
             if (!string.IsNullOrEmpty(errorLog) && data.BondDetails.Count == 0)
