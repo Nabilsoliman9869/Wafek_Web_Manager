@@ -61,7 +61,7 @@ namespace Wafek_Web_Manager.Pages
                 if (responseType != null)
                 {
                     ProcessResponse(LogId, responseType, null);
-                    LoadRequest();
+                    LoadRequest(true); // Ignore status check when processing action
                     Message = responseType == "Approved" ? "تمت الموافقة بنجاح." : responseType == "Rejected" ? "تم الرفض." : "تم التأجيل.";
                     IsSuccess = responseType != "Rejected";
                     return Page();
@@ -75,7 +75,7 @@ namespace Wafek_Web_Manager.Pages
         {
             LogId = logId;
             ProcessResponse(logId, "Approved", null);
-            LoadRequest();
+            LoadRequest(true);
             Message = "تمت الموافقة بنجاح.";
             IsSuccess = true;
             return Page();
@@ -85,7 +85,7 @@ namespace Wafek_Web_Manager.Pages
         {
             LogId = logId;
             ProcessResponse(logId, "Rejected", null);
-            LoadRequest();
+            LoadRequest(true);
             Message = "تم الرفض.";
             IsSuccess = false;
             return Page();
@@ -95,7 +95,7 @@ namespace Wafek_Web_Manager.Pages
         {
             LogId = logId;
             ProcessResponse(logId, "Postponed", null);
-            LoadRequest();
+            LoadRequest(true);
             Message = "تم التأجيل. سيُعاد عرض الطلب لاحقاً.";
             IsSuccess = true;
             return Page();
@@ -113,7 +113,7 @@ namespace Wafek_Web_Manager.Pages
                 _ => "Postponed"
             };
             ProcessResponse(logId, responseType, responseText);
-            LoadRequest();
+            LoadRequest(true);
             Message = responseType switch
             {
                 "Approved" => "تمت الموافقة بنجاح.",
@@ -124,7 +124,7 @@ namespace Wafek_Web_Manager.Pages
             return Page();
         }
 
-        private void LoadRequest()
+        private void LoadRequest(bool ignoreStatus = false)
         {
             var connStr = GetConnectionString();
             if (string.IsNullOrEmpty(connStr)) return;
@@ -134,13 +134,15 @@ namespace Wafek_Web_Manager.Pages
                 using var conn = new SqlConnection(connStr);
                 conn.Open();
 
-                using var cmd = new SqlCommand(@"
+                var statusCondition = ignoreStatus ? "" : "AND L.Status IN ('Pending', 'WaitingForResponse')";
+                
+                using var cmd = new SqlCommand($@"
                     SELECT L.Id, L.SourceRecordId, L.WorkflowDefinitionId, L.CurrentStepOrder,
                            D.SourceTable, S.SelectedValue
                     FROM WF_Logs L
                     JOIN WF_Definitions D ON D.Id = L.WorkflowDefinitionId
                     JOIN WF_Steps S ON S.WorkflowDefinitionId = L.WorkflowDefinitionId AND S.StepOrder = L.CurrentStepOrder
-                    WHERE L.Id = @id", conn);
+                    WHERE L.Id = @id {statusCondition}", conn);
                 cmd.Parameters.AddWithValue("@id", LogId);
                 using var r = cmd.ExecuteReader();
                 if (!r.Read()) return;
