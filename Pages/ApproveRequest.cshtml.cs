@@ -157,13 +157,9 @@ namespace Wafek_Web_Manager.Pages
                     selectedValue = r.IsDBNull(5) ? "" : r.GetString(5);
                 }
                 
-                // IMPORTANT: Close the connection here before calling EmailBodyBuilder, 
-                // because EmailBodyBuilder uses the same connection string and might 
-                // cause "There is already an open DataReader" if MARS is not enabled.
-                conn.Close();
-
-                var builder = new EmailBodyBuilder(connStr);
-                var docData = builder.GetDocumentData(sourceId, sourceTable);
+                // IMPORTANT: EmailBodyBuilder.GetDocumentData now takes the connection directly.
+                // Since we are done with the DataReader above, we can reuse the open connection safely.
+                var docData = EmailBodyBuilder.GetDocumentData(conn, sourceId, sourceTable);
 
                 RecipientName = ResolveRecipientName(conn, selectedValue);
                 Request = new ApproveRequestDto

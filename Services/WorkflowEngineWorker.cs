@@ -225,12 +225,13 @@ namespace Wafek_Web_Manager.Services
                 string recipientName = ResolveRecipientName(recipientRule, sourceId, sourceTable);
                 bool useArabic = GetRecipientLanguage(recipientRule) == 1;
 
-                var docData = new DocumentData();
+                EmailBodyBuilder.DocumentEmailData docData = new EmailBodyBuilder.DocumentEmailData();
                 try
                 {
                     // يجب أن نستخدم اتصالاً مستقلاً تماماً لبناء الإيميل لمنع تداخل DataReader
-                    var builder = new EmailBodyBuilder(_connectionString);
-                    docData = builder.GetDocumentData(sourceId, sourceTable);
+                    using var conn = new SqlConnection(_connectionString);
+                    conn.Open();
+                    docData = EmailBodyBuilder.GetDocumentData(conn, sourceId, sourceTable);
                 }
                 catch (Exception ex)
                 {
@@ -239,7 +240,7 @@ namespace Wafek_Web_Manager.Services
 
                 // المستند الكامل داخل الميل — رأس السند + جدول الحسابات (من الاستعلام)
                 string? documentBlock = null;
-                if (sourceTable == "TBL010")
+                if (sourceTable == "TBL010" || sourceTable == "TBL012")
                 {
                     documentBlock = EmailBodyBuilder.BuildBondPrintBlock(docData);
                     var tableBlock = !string.IsNullOrWhiteSpace(emailFormatQuery)
@@ -265,8 +266,8 @@ namespace Wafek_Web_Manager.Services
                     ? $"طلب الموافقة على {cardLabel}، المرسل {senderLabel}"
                     : $"Request for Approval of {docData.CardNameLatin ?? docData.CardName ?? sourceTable}";
                 string body = useArabic
-                    ? builder.BuildBodyArabic(docData, recipientName, approveLink, documentBlock)
-                    : builder.BuildBodyEnglish(docData, recipientName, approveLink, documentBlock);
+                    ? EmailBodyBuilder.BuildBodyArabic(docData, recipientName, approveLink, documentBlock)
+                    : EmailBodyBuilder.BuildBodyEnglish(docData, recipientName, approveLink, documentBlock);
 
                 _logger.LogInformation($"Attempting to send email via Brevo HTTP API to {recipientEmail}...");
 

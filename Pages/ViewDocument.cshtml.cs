@@ -52,9 +52,9 @@ namespace Wafek_Web_Manager.Pages
 
                 var sourceId = r.GetGuid(0);
                 var sourceTable = r.GetString(1);
+                r.Close();
 
-                var builder = new EmailBodyBuilder(connStr);
-                var docData = builder.GetDocumentData(sourceId, sourceTable);
+                var docData = EmailBodyBuilder.GetDocumentData(conn, sourceId, sourceTable);
 
                 DocumentHtml = sourceTable == "TBL010"
                     ? EmailBodyBuilder.BuildBondPrintBlock(docData)

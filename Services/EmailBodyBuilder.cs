@@ -56,7 +56,7 @@ namespace Wafek_Web_Manager.Services
         }
 
         /// <summary>رابط احتياطي للوجو عند فشل base64 (مثلاً على Render)</summary>
-        public string GetLogoFallbackUrl() => "https://raw.githubusercontent.com/Nabilsoliman9869/Wafek_Web_Manager/main/wwwroot/images/TELLEWORK.jpg";
+        public static string GetLogoFallbackUrl() => "https://raw.githubusercontent.com/Nabilsoliman9869/Wafek_Web_Manager/main/wwwroot/images/TELLEWORK.jpg";
 
         public EmailBodyBuilder(string connectionString)
         {
@@ -66,15 +66,13 @@ namespace Wafek_Web_Manager.Services
         /// <summary>
         /// جلب بيانات المستند حسب الجدول المصدر
         /// </summary>
-        public DocumentEmailData GetDocumentData(Guid sourceId, string sourceTable)
+        public static DocumentEmailData GetDocumentData(SqlConnection conn, Guid sourceId, string sourceTable)
         {
             var data = new DocumentEmailData { SourceTable = sourceTable, SourceId = sourceId };
-            if (string.IsNullOrEmpty(_connectionString)) return data;
+            if (conn == null || conn.State != System.Data.ConnectionState.Open) return data;
 
             try
             {
-                using var conn = new SqlConnection(_connectionString);
-                conn.Open();
 
                 var table = (sourceTable ?? "").ToUpperInvariant();
 
@@ -379,7 +377,7 @@ WHERE MainGuide = @id", conn);
                 if (data.BondDetails.Count > 0 && string.IsNullOrEmpty(data.TotalAmount) && sum != 0)
                     data.TotalAmount = sum.ToString("N2");
             }
-            catch (Exception ex) { // errorLog += "QryErr: " + ex.Message + " | "; }
+            catch (Exception ex) { /* errorLog += "QryErr: " + ex.Message + " | "; */ }
 
             // إذا كان QryApproveBondDetails فارغاً، نحاول TBL038
             if (data.BondDetails.Count == 0)
@@ -418,7 +416,7 @@ WHERE d.MainGuide = @id", conn);
                     if (data.BondDetails.Count > 0 && string.IsNullOrEmpty(data.TotalAmount) && sum != 0)
                         data.TotalAmount = sum.ToString("N2");
                 }
-                catch (Exception ex) { // errorLog += "FallbackErr: " + ex.Message; }
+                catch (Exception ex) { /* errorLog += "FallbackErr: " + ex.Message; */ }
             }
             
             if (!string.IsNullOrEmpty(errorLog) && data.BondDetails.Count == 0)
@@ -528,6 +526,7 @@ WHERE h.BondGuide = @id", conn);
             data.CardNumber = sourceId.ToString("N")[..Math.Min(12, sourceId.ToString("N").Length)];
             data.CardName = "سند";
         }
+
 
         private static string GetCompanyName(SqlConnection conn)
         {
@@ -722,7 +721,7 @@ WHERE h.BondGuide = @id", conn);
         /// بناء جسم الميل (عربي) — ملخص + (جدول المستند إن وُجد من استعلام شكل الإرسال) + رابط الموافقة
         /// </summary>
         /// <param name="documentBlock">اختياري: HTML جدول المستند من EmailFormatQuery</param>
-        public string BuildBodyArabic(DocumentEmailData d, string recipientName, string approveLink, string? documentBlock = null)
+        public static string BuildBodyArabic(DocumentEmailData d, string recipientName, string approveLink, string? documentBlock = null)
         {
             var cardName = d.CardName ?? "";
             var cardNum = d.CardNumber ?? "";
@@ -793,7 +792,7 @@ WHERE h.BondGuide = @id", conn);
         /// <summary>
         /// بناء جسم الميل بالإنجليزي — ملخص + (جدول المستند إن وُجد) + رابط الموافقة
         /// </summary>
-        public string BuildBodyEnglish(DocumentEmailData d, string recipientName, string approveLink, string? documentBlock = null)
+        public static string BuildBodyEnglish(DocumentEmailData d, string recipientName, string approveLink, string? documentBlock = null)
         {
             var cardName = d.CardNameLatin ?? d.CardName ?? "";
             var cardNum = d.CardNumber ?? "";
